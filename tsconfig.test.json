@@ -10,6 +10,6 @@
     "types": ["node"],
     "plugins": []
   },
-  "include": ["lib/tasks/**/*.ts", "lib/time/**/*.ts", "types/database.ts", "tests/**/*.ts"],
+  "include": ["lib/tasks/**/*.ts", "lib/time/**/*.ts", "lib/analytics/**/*.ts", "types/database.ts", "tests/**/*.ts"],
   "exclude": ["node_modules"]
 }
