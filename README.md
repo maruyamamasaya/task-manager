@@ -75,3 +75,15 @@ npm run dev
 ## Phase 1 の範囲
 
 タスク CRUD、ドラッグ＆ドロップ、タイマー、カレンダー、分析グラフ、振り返り入力などは意図的に未実装です。次フェーズでは Task を中心に project、階層、ステータス、期限を扱う CRUD と、その操作に対する統合テストを追加します。
+
+## Phase 3: Schedule / Work Log / Timer
+
+- **予定工数**は `tasks.estimated_minutes`（分）、時間帯への配置は `task_schedules.start_at/end_at` であり、互いに独立しています。`/schedule` で日付、Task、開始・終了を指定し、重複は許可しつつ警告します。
+- **実績**は `work_logs.minutes` の合計です。Task Drawer から任意分数または +15 / +30 / +60分を追加でき、履歴の note、分数を編集・削除できます。`actual - estimated` を差分、`actual / estimated * 100` を予定比として表示します（予定なしでは比率を表示しません）。
+- **タイマー**は開始時に `started_at` をDBへ保存し、画面はその値と現在時刻との差を表示します。更新・画面移動・再ログイン後も復元され、停止時に `ended_at` と分数を確定します。Phase 3 migration の partial unique index とRPCにより、ユーザーごとの作業中ログは1件だけです。
+- 一覧は Task ごとの問い合わせを行わず、Work Log / Scheduleを一括取得して集計します。日次実績は **started_at の Asia/Tokyo 上の日付**に全量を帰属させ、深夜をまたぐログも分割しません。日次予定は `start_at` の日付に帰属します。
+- DBは `timestamptz`（UTC ISO文字列）で保存し、入力・表示・日付境界は `Asia/Tokyo` とします。追加の外部サービスや環境変数はありません。
+
+既存プロジェクトではデプロイより先に `npx supabase db push` を実行し、`20260825020000_phase3_schedule_work_logs.sql` を適用してください。既存RLSは `user_id = auth.uid()` に加えて関連Taskの所有権も restrictive policy で検証し続けます。
+
+Reflection入力、Progress履歴、Analyticsグラフ、AI分析、通知、外部カレンダー連携は後続Phaseの範囲です。
