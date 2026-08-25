@@ -6,7 +6,7 @@ import { logout } from "@/app/(auth)/login/actions";
 
 const items = [
   ["Dashboard", "/dashboard", "⌂"], ["Today", "/today", "◉"], ["Tasks", "/tasks", "✓"],
-  ["Schedule", "/schedule", "▤"], ["Projects", "/projects", "◇"], ["Reflections", "/reflections", "↻"], ["Analytics", "/analytics", "⌁"],
+  ["Schedule", "/schedule", "▤"], ["休日設定", "/holidays", "休"], ["Projects", "/projects", "◇"], ["Reflections", "/reflections", "↻"], ["Analytics", "/analytics", "⌁"],
 ] as const;
 
 export function Sidebar({ email }: { email: string }) {
