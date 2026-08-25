@@ -1,6 +1,7 @@
 "use client";
 
 import { DragEvent, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { deleteSchedule, saveSchedule } from "@/app/(app)/phase3-actions";
 import { dailyTotals, formatTokyo, overlaps, scheduleMarkdown, scheduleMinutes, tokyoDateTime, varianceLabel } from "@/lib/time/phase3";
 import { holidayName } from "@/lib/time/japanese-holidays";
@@ -38,6 +39,7 @@ function dueLabel(dueAt: string | null) {
 }
 
 export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: { date: string; tasks: Task[]; projects: Project[]; schedules: TaskSchedule[]; logs: WorkLog[]; dayOff?:DayOff }) {
+  const router = useRouter();
   const [taskId, setTaskId] = useState(tasks[0]?.id ?? "");
   const [projectId, setProjectId] = useState("all");
   const [message, setMessage] = useState("");
@@ -54,7 +56,7 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
   const act = (promise: Promise<{ error?: string }>) => go(async () => {
     const result = await promise;
     setMessage(result.error ?? "スケジュールを保存しました");
-    if (!result.error) location.reload();
+    if (!result.error) router.refresh();
   });
 
   const selectTask = (task: Task) => {
@@ -113,7 +115,6 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
         </button>)}
         {!visibleTasks.length && <p className="schedule-empty">該当する未完了タスクがありません</p>}
       </div>
-      {message && <p className="schedule-message" role="status">{message}</p>}
     </aside>
 
     <section className="timeline-panel">
@@ -168,5 +169,5 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
         </div>
       </div>
     </section>
-  </div>{errorMessage&&<div className="schedule-error-backdrop" role="presentation" onClick={()=>setErrorMessage("")}><div className="schedule-error-dialog" role="alertdialog" aria-modal="true" aria-labelledby="schedule-error-title" onClick={(event)=>event.stopPropagation()}><span aria-hidden="true">!</span><h2 id="schedule-error-title">予定時間が必要です</h2><p>{errorMessage}</p><button autoFocus onClick={()=>setErrorMessage("")}>閉じる</button></div></div>}</>;
+  </div>{message&&<div className="schedule-toast" role="status"><span aria-hidden="true">✓</span><p>{message}</p><button type="button" aria-label="通知を閉じる" onClick={()=>setMessage("")}>×</button></div>}{errorMessage&&<div className="schedule-error-backdrop" role="presentation" onClick={()=>setErrorMessage("")}><div className="schedule-error-dialog" role="alertdialog" aria-modal="true" aria-labelledby="schedule-error-title" onClick={(event)=>event.stopPropagation()}><span aria-hidden="true">!</span><h2 id="schedule-error-title">予定時間が必要です</h2><p>{errorMessage}</p><button autoFocus onClick={()=>setErrorMessage("")}>閉じる</button></div></div>}</>;
 }

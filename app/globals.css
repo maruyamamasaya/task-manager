@@ -39,6 +39,9 @@ button { cursor: pointer; }
 .calendar-grid>a { min-height:112px; padding:10px; border-right:1px solid #edf0f4; border-bottom:1px solid #edf0f4; transition:background .15s; }
 .calendar-grid>a.is-holiday { background:#fff4f4; }.calendar-grid>a.is-saturday { background:#f1f7ff; }.calendar-grid>a.is-holiday time { color:#c94d5d; }.calendar-grid>a.is-saturday time { color:#3977bd; }
 .calendar-grid>a:hover { background:#f8faff; }.calendar-grid>a.is-outside { background:#fafafa; opacity:.42; }
+.calendar-grid>a.is-today { position:relative; z-index:1; background:#eef2ff; box-shadow:inset 0 0 0 2px #6366f1; }
+.calendar-grid>a.is-today time { display:grid; width:27px; height:27px; place-items:center; border-radius:50%; background:#4f46e5; color:#fff; box-shadow:0 3px 8px #4f46e54a; }
+.schedule-calendar--week .calendar-grid>a.is-today { background:linear-gradient(180deg,#eef2ff 0,#f8faff 42%); }
 .calendar-grid time { display:block; color:#475569; font-size:12px; font-weight:750; }
 .schedule-calendar--month .calendar-grid span { display:block; width:max-content; margin-top:19px; padding:4px 8px; border-radius:20px; color:#a0a8b5; font-size:10px; }
 .schedule-calendar--month .calendar-grid span.has-items { background:#eef2ff; color:#4f46e5; font-weight:800; }
@@ -53,7 +56,7 @@ button { cursor: pointer; }
 .task-count { min-width:28px; padding:5px 8px; border-radius:20px; background:#e9eef6; color:#64748b; text-align:center; font-size:11px; font-weight:800; }
 .palette-help { margin:13px 0 15px; color:#7c8798; font-size:11px; line-height:1.6; }
 .project-task-filter { display:flex; flex-direction:column; gap:5px; margin-bottom:14px; color:#64748b; font-size:10px; font-weight:750; }.project-task-filter select { width:100%; padding:9px 10px; border:1px solid #d8e0ea; border-radius:8px; background:#fff; color:#334155; font-size:11px; }
-.task-block-list { flex:1; max-height:385px; overflow:auto; padding:2px 4px 2px 2px; }
+.task-block-list { flex:1; min-height:0; overflow:auto; padding:2px 4px 2px 2px; }
 .palette-task { --task:#6366f1; --task-bg:#eef2ff; display:flex; width:100%; align-items:center; gap:9px; margin-bottom:9px; padding:11px 10px; border:1px solid #e2e8f0; border-left:4px solid var(--task); border-radius:10px; background:#fff; color:#334155; text-align:left; transition:.15s ease; }
 .palette-task:hover { border-color:#cbd5e1; transform:translateY(-1px); box-shadow:0 5px 14px #33415512; }
 .palette-task.is-selected { border-color:var(--task); background:var(--task-bg); box-shadow:0 0 0 2px color-mix(in srgb,var(--task) 12%,transparent); }
@@ -70,7 +73,8 @@ button { cursor: pointer; }
 .time-inputs { display:flex; align-items:flex-end; gap:6px; }.time-inputs label { flex:1; color:#7c8798; font-size:9px; font-weight:700; }.time-inputs span { padding-bottom:9px; color:#94a3b8; }
 .time-inputs input { width:100%; margin-top:4px; padding:7px 4px; border:1px solid #d9e0e9; border-radius:7px; background:#fff; color:#334155; font-size:11px; }
 .schedule-save { width:100%; margin-top:10px; padding:9px; border:0; border-radius:8px; background:#334155; color:#fff; font-size:11px; font-weight:750; }.schedule-save:disabled { cursor:not-allowed; opacity:.45; }
-.schedule-message { color:#4f46e5!important; white-space:normal!important; }
+.schedule-toast { position:fixed; right:24px; bottom:24px; z-index:55; display:flex; min-width:min(360px,calc(100vw - 32px)); align-items:center; gap:11px; padding:13px 14px; border:1px solid #a7f3d0; border-radius:12px; background:#ecfdf5; color:#065f46; box-shadow:0 14px 36px #0f172a24; }
+.schedule-toast>span { display:grid; width:26px; height:26px; flex:none; place-items:center; border-radius:50%; background:#10b981; color:#fff; font-size:13px; font-weight:900; }.schedule-toast p { flex:1; margin:0; font-size:12px; font-weight:750; }.schedule-toast button { border:0; background:transparent; color:#047857; font-size:18px; line-height:1; }
 .timeline-panel { min-width:0; padding:24px 24px 20px; }
 .schedule-totals { display:flex; overflow:hidden; border:1px solid #e5eaf1; border-radius:9px; background:#fafbfc; }
 .schedule-totals span { padding:8px 10px; color:#8993a3; font-size:9px; }.schedule-totals span+span { border-left:1px solid #e5eaf1; }.schedule-totals b { display:block; margin-top:2px; color:#334155; font-size:11px; }
