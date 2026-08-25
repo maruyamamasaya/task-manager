@@ -15,6 +15,24 @@ export async function createTask(input: TaskInput) {
   const { error } = await db.from("tasks").insert({ ...input, title, project_id: input.project_id || null, parent_id: input.parent_id || null, due_at: input.due_at || null, estimated_minutes: input.estimated_minutes ?? null, user_id: user.id, ...state });
   if (error) return { error: error.message }; refresh(); return { ok: true };
 }
+export async function createTasks(inputs: TaskInput[]) {
+  const tasks = inputs.map(input => ({ ...input, title: input.title.trim() })).filter(input => input.title);
+  if (!tasks.length) return { error: "タスク名を入力してください。" };
+  const { db, user } = await context();
+  const rows = tasks.map(input => ({
+    ...input,
+    project_id: input.project_id || null,
+    parent_id: input.parent_id || null,
+    due_at: input.due_at || null,
+    estimated_minutes: input.estimated_minutes ?? null,
+    user_id: user.id,
+    ...normalizeState(input.status ?? "todo", input.progress ?? 0),
+  }));
+  const { error } = await db.from("tasks").insert(rows);
+  if (error) return { error: error.message };
+  refresh();
+  return { ok: true, count: rows.length };
+}
 export async function updateTask(id: string, input: TaskInput) {
   const { db } = await context(); const state = normalizeState(input.status ?? "todo", clampProgress(input.progress ?? 0));
   const { error } = await db.from("tasks").update({ title: input.title.trim(), description: input.description || null, project_id: input.project_id || null, priority: input.priority, estimated_minutes: input.estimated_minutes ?? null, due_at: input.due_at || null, ...state, completed_at: state.status === "done" ? new Date().toISOString() : null }).eq("id", id);
