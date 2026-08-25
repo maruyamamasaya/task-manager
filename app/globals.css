@@ -1,8 +1,24 @@
 @import "tailwindcss";
 
-:root { color-scheme: light; --brand: #5b5bd6; }
+:root {
+  color-scheme: light;
+  --brand: #6366f1;
+  --brand-deep: #4f46e5;
+  --ink: #172033;
+}
 * { box-sizing: border-box; }
-body { margin: 0; background: #f7f8fb; color: #20212b; font-family: Arial, "Noto Sans JP", sans-serif; }
+html { background: #f4f6fb; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 80% -10%, rgb(199 210 254 / .34), transparent 34rem),
+    radial-gradient(circle at 10% 90%, rgb(186 230 253 / .24), transparent 30rem),
+    #f4f6fb;
+  color: var(--ink);
+  font-family: Inter, "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
 button, input { font: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 3px solid #b9b9fa; outline-offset: 2px; }
+::selection { background: #c7d2fe; color: #312e81; }
