@@ -146,7 +146,6 @@ if (typeof document !== "undefined") {
     });
     node.querySelector(".edit-task").addEventListener("click", () => startEditing(node));
     node.querySelector(".delete-task").addEventListener("click", () => {
-      if (task.children.length && !confirm(`「${task.name}」と子タスクを削除しますか？`)) return;
       removeTask(tasks, task.id); synchronizeTree(tasks); commit(); announce("タスクを削除しました");
     });
     edit.addEventListener("keydown", (event) => { if (event.key === "Enter") finishEditing(node, task); if (event.key === "Escape") { edit.value = task.name; node.classList.remove("editing"); } });
