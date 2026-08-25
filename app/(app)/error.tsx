@@ -1,0 +1,2 @@
+"use client";
+export default function ErrorPage({ reset }: { error: Error; reset: () => void }) { return <div className="rounded-2xl border border-red-100 bg-white p-8"><h1 className="text-xl font-bold">画面を読み込めませんでした</h1><p className="mt-2 text-sm text-slate-500">時間をおいて、もう一度お試しください。</p><button onClick={reset} className="mt-5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">再試行</button></div>; }

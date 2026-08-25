@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+:root { color-scheme: light; --brand: #5b5bd6; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #f7f8fb; color: #20212b; font-family: Arial, "Noto Sans JP", sans-serif; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid #b9b9fa; outline-offset: 2px; }
