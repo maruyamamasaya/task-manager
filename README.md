@@ -99,3 +99,30 @@ Reflection入力、Progress履歴、Analyticsグラフ、AI分析、通知、外
 - `20260825030000_phase4_progress_reflections.sql` はRPC、Reflection一意制約、履歴用indexを追加します。既存のrestrictive RLSにより、`user_id` に加えて関連Taskがログインユーザー所有であることを検証します。RPCも `auth.uid()` とRLSの両方を維持します。
 - Task Drawerでは明示的な保存を採用し、slider操作ごとのDB書き込みを避けます。Reflectionも明示保存のため、エラー時は入力を画面に保持して再試行できます。
 - Phase 5ではAnalytics、長期進捗トレンド、複数Reflection履歴、通知・AI支援を扱います。
+
+## Phase 5: Dashboard / Analytics
+
+### 画面の役割
+
+- `/dashboard` は「今日何をするか・今どうなっているか」の概要です。Tokyo日付、今日のSchedule件数と時間、実績、日次差分、完了、振り返り待ち、稼働中タイマー、時系列Schedule、完了Task、Project進捗を表示し、操作画面へリンクします。Todayは引き続き今日のTaskを操作する画面です。
+- `/analytics` は「過去の結果・傾向・見積り・改善」を見る画面です。7 / 30 / 90日 / 全期間とProjectで絞り込み、KPI、日別予定/実績/完了、Project集計、曜日別平均、進捗更新、Reflection、予定超過上位を表示します。グラフの下には同じ値のテキスト表を置き、色だけに依存しません。
+
+### 指標定義
+
+- **Task予定工数**: 期間内に `completed_at` があるTaskの `tasks.estimated_minutes` 合計。**Schedule予定**とは別の値です。
+- **Schedule予定**: `task_schedules.start_at` のTokyo日付に、`end_at - start_at` の全分数を帰属させた値です。日をまたぐ予定も開始日に帰属します。
+- **実績工数**: 期間内に `started_at` がある `work_logs.minutes` の合計。稼働中は `started_at` から表示時刻までを算出します。日をまたぐログも開始日に帰属します。
+- **Task予実差分**: 期間実績 − 期間内完了Taskの予定工数。日次グラフの差分は実績 − Schedule予定です。
+- **平均予定比**: 予定が1分以上の比較対象Taskごとに `actual / estimated × 100` を求めた単純平均です。
+- **平均見積り誤差**: 同じ比較対象について `abs(actual - estimated) / estimated × 100` の単純平均です。予定0 / 未設定は両指標から除外します。「予定内」は `actual <= estimated` の割合です。
+- **1稼働日平均**: 実績が1分以上ある日の実績合計 ÷ 稼働日数。**平均Task完了時間**は期間内完了Taskの `created_at` から `completed_at` までの経過時間です。
+- **Reflection入力率**: 期間内完了TaskのうちTask単位のReflectionが存在する割合です。完了数は常に `completed_at` 基準で、`status=done` のみの異常行は数えません。
+- **Project集計**: Projectに直接属する全Taskを同じ重みで数え、平均進捗・完了/総数を表示します。Projectなしは「未分類」です。親子Taskもそれぞれ直接保存された予定・Work Logだけを1回ずつ集計し、親へ子の工数を暗黙加算しないため二重加算しません。
+
+### Query・セキュリティ・性能
+
+AnalyticsはServer ComponentでTaskを一括取得し、Work Log / Schedule / Progress Logは選択期間を `gte` / `lt` で**DB Query時に制限**します。Project選択時は取得済みTask IDを各一括Queryの `in` 条件へ渡します。ReflectionとProjectも一括取得し、Taskごとの問い合わせは行わず、純粋関数で集計済みの小さな配列だけをChartへ渡します。この方式は少〜中規模の個人利用でRPCの保守コストを増やさずN+1を避けられるため採用しました。ポーリングはなく、画面遷移とServer Action後のrevalidateだけで更新します。
+
+すべて通常のSSR Supabase clientとログインユーザーのセッションを利用し、service role keyは使用しません。既存の `user_id = auth.uid()` とTask所有権のrestrictive RLSがDashboard / Analyticsにも適用されます。Phase 5 migration `20260825040000_phase5_analytics_indexes.sql` は `tasks(user_id, completed_at)`（完了行のみ）、`tasks(user_id, project_id)`、`progress_logs(user_id, created_at)`、`reflections(user_id, created_at)` を追加します。Work LogとScheduleのユーザー+日時indexはPhase 3ですでに存在します。既存環境ではデプロイ前に `npx supabase db push` を実行してください。
+
+タイムゾーンは全画面で **Asia/Tokyo**、DB保存は `timestamptz` です。今後のPhase 6候補はCustom Range、CSV、時間帯分析、複数Reflection履歴、AI分析、通知、チーム共有、Calendar / Slack連携です。本Phaseではこれら外部連携、課金、管理画面を実装しません。

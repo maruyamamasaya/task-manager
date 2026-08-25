@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { minutesBetween } from "@/lib/time/phase3";
 async function context(){const db=await createClient();const {data:{user}}=await db.auth.getUser();if(!user)throw new Error("認証が必要です。");return {db,user};}
-const refresh=()=>{revalidatePath("/tasks");revalidatePath("/today");revalidatePath("/schedule");};
+const refresh=()=>{revalidatePath("/tasks");revalidatePath("/today");revalidatePath("/schedule");revalidatePath("/dashboard");revalidatePath("/analytics");};
 export async function saveSchedule(input:{id?:string;taskId:string;startAt:string;endAt:string}){const {db,user}=await context();if(new Date(input.startAt)>=new Date(input.endAt))return {error:"終了時刻は開始時刻より後にしてください。"};const row={task_id:input.taskId,user_id:user.id,start_at:input.startAt,end_at:input.endAt};const q=input.id?db.from("task_schedules").update(row).eq("id",input.id):db.from("task_schedules").insert(row);const {error}=await q;if(error)return {error:error.message};refresh();return {ok:true};}
 export async function deleteSchedule(id:string){const {db}=await context();const {error}=await db.from("task_schedules").delete().eq("id",id);if(error)return {error:error.message};refresh();return {ok:true};}
 export async function addWorkLog(taskId:string,minutes:number,note=""){if(!Number.isInteger(minutes)||minutes<=0)return {error:"1分以上の整数を入力してください。"};const {db,user}=await context();const end=new Date(),start=new Date(end.getTime()-minutes*60000);const {error}=await db.from("work_logs").insert({task_id:taskId,user_id:user.id,started_at:start.toISOString(),ended_at:end.toISOString(),minutes,note:note.trim()||null});if(error)return {error:error.message};refresh();return {ok:true};}
