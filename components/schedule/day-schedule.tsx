@@ -2,7 +2,7 @@
 
 import { DragEvent, useMemo, useState, useTransition } from "react";
 import { deleteSchedule, saveSchedule } from "@/app/(app)/phase3-actions";
-import { dailyTotals, formatTokyo, overlaps, scheduleMinutes, tokyoDateTime, varianceLabel } from "@/lib/time/phase3";
+import { dailyTotals, formatTokyo, overlaps, scheduleMarkdown, scheduleMinutes, tokyoDateTime, varianceLabel } from "@/lib/time/phase3";
 import type { Task, TaskSchedule, WorkLog } from "@/types/database";
 
 const START_HOUR = 9;
@@ -43,6 +43,7 @@ export function DaySchedule({ date, tasks, schedules, logs }: { date: string; ta
   const [pending, go] = useTransition();
   const totals = dailyTotals(schedules, logs);
   const taskMap = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
+  const copySchedule = async () => { await navigator.clipboard.writeText(scheduleMarkdown(date,schedules,new Map(tasks.map(t=>[t.id,t.title])))); setMessage("Markdown形式のスケジュールをコピーしました"); };
 
   const act = (promise: Promise<{ error?: string }>) => go(async () => {
     const result = await promise;
@@ -115,7 +116,7 @@ export function DaySchedule({ date, tasks, schedules, logs }: { date: string; ta
     <section className="timeline-panel">
       <div className="timeline-heading">
         <div><span className="eyebrow">DAILY TIMELINE</span><h2>今日の時間割</h2></div>
-        <div className="schedule-totals"><span>予定 <b>{totals.planned}分</b></span><span>実績 <b>{totals.actual}分</b></span><span>差分 <b>{varianceLabel(totals.difference)}</b></span></div>
+        <div className="schedule-totals"><span>予定 <b>{totals.planned}分</b></span><span>実績 <b>{totals.actual}分</b></span><span>差分 <b>{varianceLabel(totals.difference)}</b></span><button onClick={copySchedule}>Markdownをコピー</button></div>
       </div>
       <div className="timeline-legend"><span><i className="legend-dot" />15分単位で配置</span><span>ブロックをドラッグして移動</span></div>
       <div className="timeline-scroll-area">

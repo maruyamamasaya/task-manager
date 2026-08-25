@@ -1,3 +1,20 @@
 import Link from "next/link";
-import {PageHeader} from "@/components/ui/page-header";import {DaySchedule} from "@/components/schedule/day-schedule";import {createClient} from "@/lib/supabase/server";import {tokyoDateKey,tokyoDayBounds} from "@/lib/time/phase3";
-export default async function Page({searchParams}:{searchParams:Promise<{date?:string}>}){const date=(await searchParams).date??tokyoDateKey(new Date()),bounds=tokyoDayBounds(date),db=await createClient();const [{data:tasks},{data:schedules,error},{data:logs}]=await Promise.all([db.from("tasks").select("*").neq("status","done").order("due_at",{ascending:true,nullsFirst:false}),db.from("task_schedules").select("*").gte("start_at",bounds.start).lt("start_at",bounds.end).order("start_at"),db.from("work_logs").select("*").gte("started_at",bounds.start).lt("started_at",bounds.end)]);if(error)throw error;const move=(days:number)=>{const d=new Date(`${date}T00:00:00+09:00`);d.setUTCDate(d.getUTCDate()+days);return tokyoDateKey(d)};return <><PageHeader title="Schedule" description="タスクをドラッグして、一日の流れを組み立てましょう。"/><nav className="schedule-date-nav"><Link href={`/schedule?date=${move(-1)}`} aria-label="前日">←</Link><div><span>表示日</span><b>{date}</b><Link href="/schedule">今日</Link></div><Link href={`/schedule?date=${move(1)}`} aria-label="翌日">→</Link></nav><DaySchedule date={date} tasks={tasks??[]} schedules={schedules??[]} logs={logs??[]}/></>}
+import {PageHeader} from "@/components/ui/page-header";
+import {DaySchedule} from "@/components/schedule/day-schedule";
+import {ScheduleCalendar} from "@/components/schedule/schedule-calendar";
+import {createClient} from "@/lib/supabase/server";
+import {tokyoDateKey,tokyoDayBounds} from "@/lib/time/phase3";
+
+type View="month"|"week"|"day";
+const shift=(date:string,view:View,direction:number)=>{const d=new Date(`${date}T00:00:00+09:00`);if(view==="month")d.setUTCMonth(d.getUTCMonth()+direction);else d.setUTCDate(d.getUTCDate()+direction*(view==="week"?7:1));return tokyoDateKey(d)};
+function range(date:string,view:View){if(view==="day")return tokyoDayBounds(date);const d=new Date(`${date}T00:00:00+09:00`);if(view==="month"){d.setUTCDate(1);d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));}else d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));const length=view==="month"?42:7;return{start:d.toISOString(),end:new Date(d.getTime()+length*86400000).toISOString()};}
+
+export default async function Page({searchParams}:{searchParams:Promise<{date?:string;view?:string}>}){
+  const params=await searchParams,date=params.date??tokyoDateKey(new Date()),view=(['month','week','day'].includes(params.view??'')?params.view:'month') as View,bounds=range(date,view),db=await createClient();
+  const [{data:tasks},{data:schedules,error},{data:logs}]=await Promise.all([db.from("tasks").select("*").order("due_at",{ascending:true,nullsFirst:false}),db.from("task_schedules").select("*").gte("start_at",bounds.start).lt("start_at",bounds.end).order("start_at"),view==="day"?db.from("work_logs").select("*").gte("started_at",bounds.start).lt("started_at",bounds.end):Promise.resolve({data:[]})]);if(error)throw error;
+  const label=view==="month"?`${date.slice(0,4)}年 ${Number(date.slice(5,7))}月`:view==="week"?`${date.replaceAll('-','/')} の週`:date.replaceAll('-','/');
+  return <><PageHeader title="Schedule" description="月・週・日の階層で、予定の密度から時間割まで確認できます。"/>
+    <div className="schedule-view-tabs">{([['month','月'],['week','週'],['day','日']] as const).map(([key,text])=><Link key={key} className={view===key?'active':''} href={`/schedule?view=${key}&date=${date}`}>{text}</Link>)}</div>
+    <nav className="schedule-date-nav"><Link href={`/schedule?view=${view}&date=${shift(date,view,-1)}`} aria-label="前へ">←</Link><div><span>{view.toUpperCase()}</span><b>{label}</b><Link href={`/schedule?view=${view}`}>今日</Link></div><Link href={`/schedule?view=${view}&date=${shift(date,view,1)}`} aria-label="次へ">→</Link></nav>
+    {view==="day"?<DaySchedule date={date} tasks={(tasks??[]).filter(t=>t.status!=="done")} schedules={schedules??[]} logs={logs??[]}/>:<ScheduleCalendar view={view} date={date} tasks={tasks??[]} schedules={schedules??[]}/>}</>;
+}
