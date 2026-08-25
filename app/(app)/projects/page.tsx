@@ -1,2 +1,2 @@
-import { EmptyState } from "@/components/ui/empty-state"; import { PageHeader } from "@/components/ui/page-header";
-export default function Page() { return <><PageHeader title="Projects" description="関連するタスクをプロジェクトにまとめます。" /><EmptyState title="プロジェクトはまだありません" description="プロジェクト管理は後続フェーズで利用できるようになります。" /></>; }
+import { PageHeader } from "@/components/ui/page-header";import {ProjectList} from "@/components/projects/project-list";import {createClient} from "@/lib/supabase/server";
+export default async function Page(){const db=await createClient();const{data,error}=await db.from("projects").select("*").order("archived").order("name");if(error)throw error;return <><PageHeader title="Projects" description="関連するタスクをプロジェクトにまとめます。"/><ProjectList projects={data??[]}/></>}
