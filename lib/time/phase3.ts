@@ -24,3 +24,7 @@ export function tokyoDayBounds(dateKey: string) { const start = new Date(`${date
 export function dailyTotals(schedules: {start_at:string;end_at:string}[], logs: MinuteLog[]) { const planned=schedules.reduce((n,s)=>n+scheduleMinutes(s),0), actual=totalWorkMinutes(logs); return {planned,actual,difference:actual-planned}; }
 export function tokyoDateTime(date: string, time: string) { return new Date(`${date}T${time}:00+09:00`).toISOString(); }
 export function formatTokyo(value: string, options: Intl.DateTimeFormatOptions = {}) { return new Intl.DateTimeFormat("ja-JP", {timeZone:TOKYO_TIME_ZONE,...options}).format(new Date(value)); }
+export function scheduleMarkdown(date: string, schedules: {start_at:string;end_at:string;task_id:string}[], titles: Map<string,string>) {
+  const blocks = [...schedules].sort((a,b)=>a.start_at.localeCompare(b.start_at)).map(item => `${formatTokyo(item.start_at,{hour:"2-digit",minute:"2-digit",hourCycle:"h23"})} - ${formatTokyo(item.end_at,{hour:"2-digit",minute:"2-digit",hourCycle:"h23"})}\n${titles.get(item.task_id) ?? "削除されたタスク"}`);
+  return `## ${date.replaceAll("-", "/")} スケジュール\n\n${blocks.join("\n\n")}`.trimEnd();
+}
