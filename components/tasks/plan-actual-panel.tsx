@@ -1,8 +1,8 @@
 "use client";
-import { useState,useTransition } from "react";
-import { addWorkLog } from "@/app/(app)/phase3-actions";
-import { totalWorkMinutes } from "@/lib/time/phase3";
-import type { Task,WorkLog } from "@/types/database";
+import { useEffect,useState,useTransition } from "react";
+import { addWorkLog,deleteWorkLog,startTimer,stopTimer,updateWorkLog } from "@/app/(app)/phase3-actions";
+import { actualRate,formatTokyo,scheduleMinutes,totalWorkMinutes,variance,varianceLabel } from "@/lib/time/phase3";
+import type { Task,TaskSchedule,WorkLog } from "@/types/database";
 
 const button="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50";
 function Clock({start}:{start:string}){const [now,setNow]=useState(Date.now());useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(id)},[]);const seconds=Math.max(0,Math.floor((now-new Date(start).getTime())/1000));return <span className="font-mono">{[Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(n=>String(n).padStart(2,"0")).join(":")}</span>}
