@@ -1,6 +1,6 @@
 # Task Manager
 
-予定・実績・進捗・スケジュール・振り返りを、中心となる `Task` に関連付けて管理する Web アプリです。Phase 1 では、安全に機能を拡張するための認証、データベース、共通 UI を整備しています。
+予定・実績・進捗・スケジュール・振り返りを、中心となる `Task` に関連付けて管理する Web アプリです。Phase 2 では Supabase に永続化する階層タスク、Project、Today、Markdown Import / Export を提供します。
 
 ## 技術構成
 
@@ -40,7 +40,7 @@ npx supabase link --project-ref <project-ref>
 npx supabase db push
 ```
 
-または `supabase/migrations/20260825000000_initial_schema.sql` を SQL Editor で実行できます。migration は7テーブル、外部キー、検査制約、インデックス、更新日時トリガー、および全テーブルの RLS を作成します。RLS は認証ユーザーの `auth.uid()` と `user_id`（profile は `id`）を照合し、関連する project/task も同一ユーザー所有か検証します。
+既存環境にも `npx supabase db push` で Phase 2 migration を適用してください。初期 migration は7テーブル、外部キー、検査制約、インデックス、更新日時トリガー、および全テーブルの RLS を作成します。RLS は認証ユーザーの `auth.uid()` と `user_id`（profile は `id`）を照合し、関連する project/task も同一ユーザー所有か検証します。Phase 2 migration は3階層制約と、RLSを維持した原子的な完了連動RPCを追加します。
 
 ローカル起動:
 
@@ -48,7 +48,7 @@ npx supabase db push
 npm run dev
 ```
 
-`http://localhost:3000/login` からログインします。品質チェックは `npm run lint` と `npm run build` で実行できます。
+`http://localhost:3000/login` からログインします。品質チェックは `npm run lint`、`npm test`、`npm run build` で実行できます。
 
 ## ルートと構成
 
