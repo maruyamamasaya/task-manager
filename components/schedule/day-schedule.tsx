@@ -166,7 +166,7 @@ export function DaySchedule({ date, tasks, schedules, logs, dayOff }: { date: st
               <span className="timeline-task-time">{startValue}–{timeValue(new Date(schedule.end_at))}</span>
               <strong>{task?.title ?? "削除されたタスク"}</strong>
               <small>{dueLabel(task?.due_at ?? null)}{conflict ? " · 予定が重複しています" : ""}</small>
-              <span className="timeline-delete" role="button" aria-label="予定を削除" onClick={(event) => { event.stopPropagation(); if (confirm("この予定を削除しますか？")) act(deleteSchedule(schedule.id)); }}>×</span>
+              <span className="timeline-delete" role="button" aria-label="予定を削除" onClick={(event) => { event.stopPropagation(); act(deleteSchedule(schedule.id)); }}>×</span>
             </button>;
           })}
           {dropPreview && <div
