@@ -1,0 +1,1 @@
+export default function Loading() { return <div aria-label="読み込み中" className="animate-pulse space-y-6"><div className="h-9 w-48 rounded bg-slate-200"/><div className="h-64 rounded-2xl bg-slate-200"/></div>; }
