@@ -11,6 +11,9 @@ const HOUR_HEIGHT = 76;
 const MINUTES_PER_STEP = 15;
 const COLORS = ["violet", "sky", "amber", "emerald", "rose"] as const;
 
+type DraggingTask = { taskId: string; scheduleId?: string; duration: number; title: string };
+type DropPreview = DraggingTask & { offset: number };
+
 function timeValue(date: Date) {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
   const hour = parts.find((part) => part.type === "hour")?.value ?? "00";
@@ -40,6 +43,8 @@ export function DaySchedule({ date, tasks, schedules, logs }: { date: string; ta
   const [editing, setEditing] = useState<string>();
   const [message, setMessage] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const [dragging, setDragging] = useState<DraggingTask>();
+  const [dropPreview, setDropPreview] = useState<DropPreview>();
   const [pending, go] = useTransition();
   const totals = dailyTotals(schedules, logs);
   const taskMap = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
@@ -64,19 +69,30 @@ export function DaySchedule({ date, tasks, schedules, logs }: { date: string; ta
     const duration = Math.max(MINUTES_PER_STEP, task.estimated_minutes ?? 60);
     setEnd(valueFromMinutes(Math.min((END_HOUR - START_HOUR) * 60, minutesFromStart(start) + duration)));
   };
-  const dropOnTimeline = (event: DragEvent<HTMLDivElement>) => {
+  const previewAtPointer = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    setDragOver(false);
-    const task = event.dataTransfer.getData("task-id");
-    const scheduleId = event.dataTransfer.getData("schedule-id");
-    if (!task) return;
+    if (!dragging) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const rawMinutes = ((event.clientY - rect.top) / HOUR_HEIGHT) * 60;
     const offset = Math.max(0, Math.min((END_HOUR - START_HOUR) * 60 - MINUTES_PER_STEP, Math.round(rawMinutes / MINUTES_PER_STEP) * MINUTES_PER_STEP));
-    const existing = schedules.find((item) => item.id === scheduleId);
-    const duration = existing ? scheduleMinutes(existing) : Math.max(MINUTES_PER_STEP, taskMap.get(task)?.estimated_minutes ?? 60);
-    const boundedDuration = Math.min(duration, (END_HOUR - START_HOUR) * 60 - offset);
-    act(saveSchedule({ id: scheduleId || undefined, taskId: task, startAt: tokyoDateTime(date, valueFromMinutes(offset)), endAt: tokyoDateTime(date, valueFromMinutes(offset + boundedDuration)) }));
+    setDragOver(true);
+    setDropPreview({ ...dragging, offset });
+    event.dataTransfer.dropEffect = dragging.scheduleId ? "move" : "copy";
+  };
+  const finishDragging = () => {
+    setDragging(undefined);
+    setDropPreview(undefined);
+    setDragOver(false);
+  };
+  const dropOnTimeline = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (!dragging) return finishDragging();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const rawMinutes = ((event.clientY - rect.top) / HOUR_HEIGHT) * 60;
+    const offset = Math.max(0, Math.min((END_HOUR - START_HOUR) * 60 - MINUTES_PER_STEP, Math.round(rawMinutes / MINUTES_PER_STEP) * MINUTES_PER_STEP));
+    const boundedDuration = Math.min(dragging.duration, (END_HOUR - START_HOUR) * 60 - offset);
+    act(saveSchedule({ id: dragging.scheduleId, taskId: dragging.taskId, startAt: tokyoDateTime(date, valueFromMinutes(offset)), endAt: tokyoDateTime(date, valueFromMinutes(offset + boundedDuration)) }));
+    finishDragging();
   };
 
   return <div className="schedule-workspace">
@@ -90,7 +106,8 @@ export function DaySchedule({ date, tasks, schedules, logs }: { date: string; ta
         {tasks.map((task, index) => <button
           key={task.id}
           draggable
-          onDragStart={(event) => { event.dataTransfer.setData("task-id", task.id); event.dataTransfer.effectAllowed = "copy"; }}
+          onDragStart={(event) => { event.dataTransfer.setData("task-id", task.id); event.dataTransfer.effectAllowed = "copy"; setDragging({ taskId: task.id, duration: Math.max(MINUTES_PER_STEP, task.estimated_minutes ?? 60), title: task.title }); }}
+          onDragEnd={finishDragging}
           onClick={() => selectTask(task)}
           className={`palette-task palette-task--${COLORS[index % COLORS.length]} ${taskId === task.id ? "is-selected" : ""}`}
         >
@@ -118,13 +135,14 @@ export function DaySchedule({ date, tasks, schedules, logs }: { date: string; ta
         <div><span className="eyebrow">DAILY TIMELINE</span><h2>今日の時間割</h2></div>
         <div className="schedule-totals"><span>予定 <b>{totals.planned}分</b></span><span>実績 <b>{totals.actual}分</b></span><span>差分 <b>{varianceLabel(totals.difference)}</b></span><button onClick={copySchedule}>Markdownをコピー</button></div>
       </div>
-      <div className="timeline-legend"><span><i className="legend-dot" />15分単位で配置</span><span>ブロックをドラッグして移動</span></div>
+      <div className="timeline-legend"><span><i className="legend-dot" />15分単位・ドラッグ中に開始時刻を表示</span><span>ブロックをドラッグして移動</span></div>
       <div className="timeline-scroll-area">
         <div
           className={`day-timeline ${dragOver ? "is-drag-over" : ""}`}
           style={{ height: (END_HOUR - START_HOUR) * HOUR_HEIGHT }}
-          onDragOver={(event) => { event.preventDefault(); setDragOver(true); event.dataTransfer.dropEffect = "move"; }}
-          onDragLeave={() => setDragOver(false)}
+          onDragEnter={previewAtPointer}
+          onDragOver={previewAtPointer}
+          onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { setDragOver(false); setDropPreview(undefined); } }}
           onDrop={dropOnTimeline}
         >
           {Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, index) => <div key={index} className="timeline-hour" style={{ top: index * HOUR_HEIGHT }}><time>{String(START_HOUR + index).padStart(2, "0")}:00</time><span /></div>)}
@@ -137,7 +155,8 @@ export function DaySchedule({ date, tasks, schedules, logs }: { date: string; ta
             return <button
               key={schedule.id}
               draggable
-              onDragStart={(event) => { event.dataTransfer.setData("task-id", schedule.task_id); event.dataTransfer.setData("schedule-id", schedule.id); event.dataTransfer.effectAllowed = "move"; }}
+              onDragStart={(event) => { event.dataTransfer.setData("task-id", schedule.task_id); event.dataTransfer.setData("schedule-id", schedule.id); event.dataTransfer.effectAllowed = "move"; setDragging({ taskId: schedule.task_id, scheduleId: schedule.id, duration: scheduleMinutes(schedule), title: task?.title ?? "削除されたタスク" }); }}
+              onDragEnd={finishDragging}
               onClick={() => choose(schedule)}
               className={`timeline-task timeline-task--${COLORS[index % COLORS.length]} ${conflict ? "has-conflict" : ""}`}
               style={{ top, height }}
@@ -148,6 +167,15 @@ export function DaySchedule({ date, tasks, schedules, logs }: { date: string; ta
               <span className="timeline-delete" role="button" aria-label="予定を削除" onClick={(event) => { event.stopPropagation(); if (confirm("この予定を削除しますか？")) act(deleteSchedule(schedule.id)); }}>×</span>
             </button>;
           })}
+          {dropPreview && <div
+            className="timeline-drop-preview"
+            style={{ top: dropPreview.offset / 60 * HOUR_HEIGHT, height: Math.max(32, Math.min(dropPreview.duration, (END_HOUR - START_HOUR) * 60 - dropPreview.offset) / 60 * HOUR_HEIGHT) }}
+            aria-hidden="true"
+          >
+            <span className="drop-preview-time">{valueFromMinutes(dropPreview.offset)}</span>
+            <strong>{dropPreview.title}</strong>
+            <small>{valueFromMinutes(dropPreview.offset)}–{valueFromMinutes(dropPreview.offset + Math.min(dropPreview.duration, (END_HOUR - START_HOUR) * 60 - dropPreview.offset))}</small>
+          </div>}
           {!schedules.length && <div className="timeline-empty"><span>＋</span><strong>タスクをここにドロップ</strong><small>9:00〜20:00の間に予定を配置できます</small></div>}
         </div>
       </div>
