@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Markdownのタスクを1日の時間軸へ配置するスケジュール作成ツール">
+  <meta name="theme-color" content="#f7f8fa">
+  <title>03_スケジュールプロット</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-icon" aria-hidden="true">▦</span><div><p>SCHEDULE PLOTTER</p><h1>03_スケジュールプロット</h1></div></div>
+    <div class="today-label"><span>本日</span><strong id="dateLabel"></strong></div>
+    <div class="header-actions">
+      <button id="openImport" class="button">Markdownを読み込む</button>
+      <button id="openSettings" class="button">⚙ 設定</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="task-panel">
+      <div class="panel-head"><div><p class="section-label">TODAY'S TASKS</p><h2>今日のタスク一覧</h2></div><span id="taskCount" class="count-badge">0</span></div>
+      <div class="task-view-tabs" role="tablist" aria-label="タスクの編集方法"><button id="showTaskList" class="task-view-tab active" role="tab" aria-selected="true">一覧</button><button id="showMarkdownEditor" class="task-view-tab" role="tab" aria-selected="false">Markdownで編集</button></div>
+      <div id="markdownEditor" class="markdown-editor" hidden><label for="taskMarkdown">Markdownタスク</label><textarea id="taskMarkdown" rows="12" placeholder="- [ ] タスク名 【進捗: 0%】 （予：60分 / 実：）"></textarea><button id="saveMarkdown" class="button primary" type="button">タスク一覧に反映</button></div>
+      <div id="taskListView" class="task-list-view">
+      <div class="summary-row"><div><strong id="placedCount">0</strong><span>配置済み</span></div><div><strong id="unplacedCount">0</strong><span>未配置</span></div></div>
+      <label class="search"><span>⌕</span><input id="taskSearch" type="search" placeholder="タスクを検索"></label>
+      <label class="check-line"><input id="showCompleted" type="checkbox"> 完了済みも表示</label>
+      <div id="taskList" class="task-list"></div>
+      <div id="taskEmpty" class="task-empty"><span>☷</span><strong>タスクがありません</strong><p>Markdownを読み込んでください</p></div>
+      <p class="drag-help">タスクを右の時間軸へドラッグして配置</p>
+      </div>
+    </aside>
+
+    <section class="schedule-panel">
+      <div class="schedule-head">
+        <div><p class="section-label">DAILY TIMELINE</p><h2>1日のスケジュール</h2></div>
+        <div class="schedule-actions"><button id="copyMarkdown" class="button">Markdownでコピー</button><button id="copyCompact" class="button">簡易形式</button><button id="clearSchedule" class="button danger">クリア</button></div>
+      </div>
+      <div id="overlapWarnings" class="warnings" aria-live="polite"></div>
+      <div id="timelineScroll" class="timeline-scroll"><div id="timeline" class="timeline" aria-label="スケジュール時間軸"></div></div>
+      <p class="local-note"><span></span>スケジュールはこのブラウザ内だけに保存されます</p>
+    </section>
+  </main>
+
+  <dialog id="importDialog">
+    <form method="dialog" class="dialog-card wide"><div class="dialog-head"><div><p class="section-label">IMPORT TASKS</p><h2>Markdownを読み込む</h2></div><button class="close" value="cancel" aria-label="閉じる">×</button></div>
+      <p class="dialog-note">元のMarkdownは変更しません。タスク名・進捗・予定時間のみを読み取ります。</p>
+      <textarea id="markdownInput" rows="12" placeholder="- [ ] タスク名 【進捗: 0%】 （予：60分 / 実：）"></textarea>
+      <div class="dialog-actions"><button class="button" value="cancel">キャンセル</button><button id="importButton" type="button" class="button primary">タスクを読み込む</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog"><form method="dialog" class="dialog-card"><div class="dialog-head"><h2>表示時間の設定</h2><button class="close" value="cancel" aria-label="閉じる">×</button></div><div class="settings-grid"><label>開始<input id="startHour" type="time" step="300"></label><label>終了<input id="endHour" type="time" step="300"></label></div><p class="dialog-note">時間は5分単位で表示・配置できます。</p><div class="dialog-actions"><button class="button" value="cancel">キャンセル</button><button id="saveSettings" type="button" class="button primary">保存</button></div></form></dialog>
+
+  <dialog id="blockDialog"><form method="dialog" class="dialog-card"><div class="dialog-head"><div><p class="section-label">EDIT BLOCK</p><h2>配置を編集</h2></div><button class="close" value="cancel" aria-label="閉じる">×</button></div><label class="field">タスク<input id="editTask" readonly></label><div class="settings-grid"><label>開始<input id="editStart" type="time" step="300"></label><label>終了<input id="editEnd" type="time" step="300"></label></div><div class="estimate-box"><span>予定時間</span><strong id="editEstimate">—</strong></div><div class="dialog-actions spread"><button id="deleteBlock" type="button" class="button danger">この配置を削除</button><div><button class="button" value="cancel">キャンセル</button><button id="saveBlock" type="button" class="button primary">変更を保存</button></div></div></form></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

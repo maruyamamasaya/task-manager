@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="進捗付きチェックリストから、できたこと・できなかったこと・原因・次回の振り返りをMarkdownで作成">
+  <title>Reflection Builder</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">REFLECTION BUILDER</p>
+        <h1>進捗を、<br><span>次の一歩に。</span></h1>
+        <p class="lead">チェックリストを読み取り、タスクごとの「できた・できなかった・原因・次回」を整理します。</p>
+      </div>
+      <div class="hero-mark" aria-hidden="true">↗</div>
+    </header>
+
+    <section class="panel input-panel" aria-labelledby="inputTitle">
+      <div class="section-head">
+        <div><p class="section-label">01 / INPUT</p><h2 id="inputTitle">進捗リストを貼り付け</h2></div>
+        <button id="sampleButton" class="text-button" type="button">サンプルを入力</button>
+      </div>
+      <label class="sr-only" for="sourceInput">進捗付きMarkdownチェックリスト</label>
+      <textarea id="sourceInput" rows="9" spellcheck="false" placeholder="- [ ] テスト 【進捗: 40%】&#10;  - [ ] 新しいタスク 【進捗: 75%】&#10;- [x] テスト 【進捗: 100%】"></textarea>
+      <div class="input-footer">
+        <p>チェック状態・インデント・「進捗: n%」を読み取ります。</p>
+        <button id="buildButton" class="button primary" type="button">振り返りを作成 <span aria-hidden="true">→</span></button>
+      </div>
+      <p id="inputError" class="error" role="alert"></p>
+    </section>
+
+    <section id="reflectionSection" class="panel reflection-panel" aria-labelledby="reflectionTitle" hidden>
+      <div class="section-head">
+        <div><p class="section-label">02 / REFLECT</p><h2 id="reflectionTitle">タスクごとの振り返り</h2></div>
+        <span id="taskCount" class="count"></span>
+      </div>
+      <p class="section-copy">書ける項目だけで大丈夫です。入力内容は下のMarkdownへすぐ反映されます。</p>
+      <div id="reflectionList" class="reflection-list"></div>
+    </section>
+
+    <section id="outputSection" class="panel output-panel" aria-labelledby="outputTitle" hidden>
+      <div class="section-head">
+        <div><p class="section-label">03 / OUTPUT</p><h2 id="outputTitle">Markdown</h2></div>
+        <button id="copyButton" class="button dark" type="button">コピー</button>
+      </div>
+      <label class="sr-only" for="markdownOutput">生成されたMarkdown</label>
+      <textarea id="markdownOutput" rows="15" readonly></textarea>
+      <p id="copyStatus" class="status" role="status" aria-live="polite"></p>
+    </section>
+    <p class="privacy"><span aria-hidden="true">●</span> 入力内容は外部へ送信されません。すべてブラウザ内で処理します。</p>
+  </main>
+
+  <template id="reflectionTemplate">
+    <article class="reflection-card">
+      <div class="task-meta"><span class="task-number"></span><span class="task-path"></span></div>
+      <div class="task-heading"><span class="check-mark" aria-hidden="true"></span><h3></h3><span class="progress-pill"></span></div>
+      <div class="fields">
+        <label><span class="field-icon done">✓</span><span>できたこと</span><textarea data-field="done" rows="3" placeholder="うまく進んだこと、達成したこと"></textarea></label>
+        <label><span class="field-icon missed">–</span><span>できなかったこと</span><textarea data-field="missed" rows="3" placeholder="残ったこと、難しかったこと"></textarea></label>
+        <label><span class="field-icon cause">?</span><span>原因・気づき</span><textarea data-field="cause" rows="3" placeholder="なぜそうなったか、分かったこと"></textarea></label>
+        <label><span class="field-icon next">→</span><span>次回やること</span><textarea data-field="next" rows="3" placeholder="次に試すこと、具体的な一歩"></textarea></label>
+      </div>
+    </article>
+  </template>
+  <script src="./app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="3階層のチェックリストを作成・保存し、Markdownで入出力できるツール">
+  <title>Checklist Builder</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">CHECKLIST BUILDER</p>
+        <h1>やることを、<br><span>見えるかたちに。</span></h1>
+        <p class="lead">タスクを3階層まで整理。内容はこのブラウザに自動保存されます。</p>
+      </div>
+      <div class="hero-mark" aria-hidden="true"><span>✓</span></div>
+    </header>
+
+    <section class="workspace" aria-labelledby="listTitle">
+      <div class="toolbar">
+        <div>
+          <p class="section-label">MY CHECKLIST</p>
+          <h2 id="listTitle">チェックリスト</h2>
+        </div>
+        <div class="toolbar-actions">
+          <button id="importButton" class="button secondary" type="button">入力から作成</button>
+          <button id="copyButton" class="button primary" type="button">Markdownコピー</button>
+        </div>
+      </div>
+
+      <div class="progress-block">
+        <div class="progress-copy"><span id="progressText">0 / 0 完了</span><strong id="progressPercent">0%</strong></div>
+        <div class="progress-track" role="progressbar" aria-label="チェックリストの進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="progressBar"></span></div>
+      </div>
+
+      <div class="usage-guide" aria-labelledby="usageGuideTitle">
+        <strong id="usageGuideTitle">＋ボタンの使い方</strong>
+        <p>大タスクの＋で中タスク、中タスクの＋で小タスクを追加します。同じ階層を続けて増やすときは、追加済みのタスクで <kbd>Shift</kbd>＋クリック。小タスクの＋は、同じ階層に小タスクを追加します。</p>
+        <p class="mobile-guide">スマートフォンでは、中タスクの＋を押したあと「中タスクを追加」か「小タスクを追加」を選べます。</p>
+      </div>
+
+      <div id="list" class="task-list"></div>
+      <div id="emptyState" class="empty-state">
+        <div class="empty-icon" aria-hidden="true">✓</div>
+        <h3>最初のリストを作りましょう</h3>
+        <p>改行区切りのテキスト、またはMarkdownから始められます。</p>
+        <button id="emptyCreateButton" class="button primary" type="button">入力から作成</button>
+      </div>
+
+      <div class="list-footer">
+        <button id="addRootButton" class="text-button" type="button"><span aria-hidden="true">＋</span> 大タスクを追加</button>
+        <button id="resetButton" class="danger-button" type="button">すべて削除</button>
+      </div>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </section>
+    <p class="privacy"><span aria-hidden="true">●</span> データは外部に送信されず、このブラウザ内だけに保存されます。</p>
+  </main>
+
+  <dialog id="importDialog">
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-head">
+        <div><p class="section-label">NEW LIST</p><h2>入力から作成</h2></div>
+        <button class="close-button" value="cancel" aria-label="閉じる" type="submit">×</button>
+      </div>
+      <div class="tabs" role="tablist" aria-label="入力形式">
+        <button id="plainTab" class="tab active" role="tab" aria-selected="true" type="button">新規入力</button>
+        <button id="markdownTab" class="tab" role="tab" aria-selected="false" type="button">Markdown入力</button>
+      </div>
+      <label id="inputLabel" for="taskInput">1行に1つ、大タスクを入力</label>
+      <textarea id="taskInput" rows="10" placeholder="AWS学習&#10;OpenShift学習&#10;応用情報勉強"></textarea>
+      <p id="inputHint" class="hint">空の行は読み飛ばします。</p>
+      <div class="dialog-actions">
+        <button class="button secondary" value="cancel" type="submit">キャンセル</button>
+        <button id="createButton" class="button primary" value="default" type="button">作成</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="addTaskDialog" class="choice-dialog">
+    <div class="dialog-card">
+      <div class="dialog-head">
+        <div><p class="section-label">ADD TASK</p><h2>どちらを追加しますか？</h2></div>
+        <button id="closeAddTaskDialog" class="close-button" aria-label="閉じる" type="button">×</button>
+      </div>
+      <p class="choice-description">中タスクと、その中に入る小タスクのどちらかを選択してください。</p>
+      <div class="choice-actions">
+        <button id="addSiblingChoice" class="button secondary" type="button"><strong>中タスクを追加</strong><span>同じ階層に追加</span></button>
+        <button id="addChildChoice" class="button primary" type="button"><strong>小タスクを追加</strong><span>このタスクの中に追加</span></button>
+      </div>
+    </div>
+  </dialog>
+
+  <template id="taskTemplate">
+    <div class="task-row">
+      <label class="check-control"><input class="task-check" type="checkbox"><span aria-hidden="true"></span></label>
+      <div class="task-main"><span class="task-name"></span><input class="task-edit" type="text" maxlength="200" aria-label="タスク名を編集"></div>
+      <div class="task-actions">
+        <button class="icon-button add-child" type="button" aria-label="タスクを追加" title="タスクを追加（Shift＋クリックで同じ階層）">＋</button>
+        <button class="icon-button edit-task" type="button" aria-label="タスク名を編集" title="編集">✎</button>
+        <button class="icon-button delete-task" type="button" aria-label="タスクを削除" title="削除">×</button>
+      </div>
+    </div>
+  </template>
+  <script src="./app.js" defer></script>
+</body>
+</html>
