@@ -1,13 +1,14 @@
 export const TOKYO_TIME_ZONE = "Asia/Tokyo";
 
 export type TimedRange = { start_at: string; end_at: string | null };
-export type MinuteLog = TimedRange & { minutes: number | null };
+export type MinuteLog = { minutes: number | null; start_at?: string; end_at?: string | null; started_at?: string; ended_at?: string | null };
 
 export function minutesBetween(start: string, end: string) {
   return Math.max(0, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000));
 }
 export function logMinutes(log: MinuteLog, now = new Date()) {
-  return log.minutes ?? minutesBetween(log.start_at, log.end_at ?? now.toISOString());
+  const start = log.start_at ?? log.started_at;
+  return log.minutes ?? (start ? minutesBetween(start, log.end_at ?? log.ended_at ?? now.toISOString()) : 0);
 }
 export function totalWorkMinutes(logs: MinuteLog[]) { return logs.reduce((sum, log) => sum + logMinutes(log), 0); }
 export function variance(actual: number, estimated: number | null) { return actual - (estimated ?? 0); }

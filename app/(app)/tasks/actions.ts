@@ -6,8 +6,8 @@ import { parseMarkdown } from "@/lib/tasks/markdown";
 import type { TaskPriority, TaskStatus } from "@/types/database";
 
 async function context() { const db = await createClient(); const { data: { user } } = await db.auth.getUser(); if (!user) throw new Error("認証が必要です。"); return { db, user }; }
-const refresh = () => { revalidatePath("/tasks"); revalidatePath("/today"); };
-export type TaskInput = { title: string; description?: string; project_id?: string | null; parent_id?: string | null; priority?: TaskPriority; estimated_minutes?: number | null; due_at?: string | null; status?: TaskStatus; progress?: number };
+const refresh = () => { revalidatePath("/tasks"); revalidatePath("/today"); revalidatePath("/projects"); revalidatePath("/reflections"); };
+export type TaskInput = { title: string; description?: string | null; project_id?: string | null; parent_id?: string | null; priority?: TaskPriority; estimated_minutes?: number | null; due_at?: string | null; status?: TaskStatus; progress?: number };
 
 export async function createTask(input: TaskInput) {
   const title = input.title.trim(); if (!title) return { error: "タイトルを入力してください。" };
@@ -21,6 +21,7 @@ export async function updateTask(id: string, input: TaskInput) {
   if (error) return { error: error.message }; refresh(); return { ok: true };
 }
 export async function toggleTask(id: string, done: boolean) { const { db } = await context(); const { error } = await db.rpc("set_task_completion", { target_id: id, is_done: done }); if (error) return { error: error.message }; refresh(); return { ok: true }; }
+export async function saveProgress(id:string, progress:number, note:string) { const {db}=await context(); const {error}=await db.rpc("update_task_progress",{target_id:id,next_progress:clampProgress(progress),progress_note:note}); if(error)return{error:error.message};refresh();return{ok:true}; }
 export async function deleteTask(id: string) { const { db } = await context(); const { error } = await db.from("tasks").delete().eq("id", id); if (error) return { error: error.message }; refresh(); return { ok: true }; }
 export async function importTasks(markdown: string, projectId?: string) {
   const parsed = parseMarkdown(markdown); if (!parsed.length) return { error: "読み込めるチェックリストがありません。" };
