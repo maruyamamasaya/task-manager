@@ -3,7 +3,8 @@
 import { DragEvent, useMemo, useState, useTransition } from "react";
 import { deleteSchedule, saveSchedule } from "@/app/(app)/phase3-actions";
 import { dailyTotals, formatTokyo, overlaps, scheduleMarkdown, scheduleMinutes, tokyoDateTime, varianceLabel } from "@/lib/time/phase3";
-import type { Task, TaskSchedule, WorkLog } from "@/types/database";
+import { holidayName } from "@/lib/time/japanese-holidays";
+import type { DayOff, Task, TaskSchedule, WorkLog } from "@/types/database";
 
 const START_HOUR = 9;
 const END_HOUR = 20;
@@ -36,7 +37,7 @@ function dueLabel(dueAt: string | null) {
   return `期限 ${formatTokyo(dueAt, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`;
 }
 
-export function DaySchedule({ date, tasks, schedules, logs }: { date: string; tasks: Task[]; schedules: TaskSchedule[]; logs: WorkLog[] }) {
+export function DaySchedule({ date, tasks, schedules, logs, dayOff }: { date: string; tasks: Task[]; schedules: TaskSchedule[]; logs: WorkLog[]; dayOff?:DayOff }) {
   const [taskId, setTaskId] = useState(tasks[0]?.id ?? "");
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("10:00");
@@ -95,7 +96,8 @@ export function DaySchedule({ date, tasks, schedules, logs }: { date: string; ta
     finishDragging();
   };
 
-  return <div className="schedule-workspace">
+  const leaveLabel=dayOff?({holiday:"休日",paid_leave:"有休",am_leave:"午前休",pm_leave:"午後休"} as const)[dayOff.status]:holidayName(date);
+  return <>{leaveLabel&&<div className="day-leave-banner"><span>休</span><div><b>{leaveLabel}</b>{dayOff?.note&&<small>{dayOff.note}</small>}</div><a href="/holidays">休日設定を開く</a></div>}<div className="schedule-workspace">
     <aside className="task-palette">
       <div className="schedule-section-heading">
         <div><span className="eyebrow">UNSCHEDULED TASKS</span><h2>タスクを選ぶ</h2></div>
@@ -180,5 +182,5 @@ export function DaySchedule({ date, tasks, schedules, logs }: { date: string; ta
         </div>
       </div>
     </section>
-  </div>;
+  </div></>;
 }
