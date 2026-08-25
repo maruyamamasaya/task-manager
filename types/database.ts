@@ -12,3 +12,5 @@ export interface Project {
   id: string; user_id: string; name: string; description: string | null; color: string | null;
   archived: boolean; created_at: string; updated_at: string;
 }
+export interface TaskSchedule { id:string;task_id:string;user_id:string;start_at:string;end_at:string;created_at:string; }
+export interface WorkLog { id:string;task_id:string;user_id:string;started_at:string;ended_at:string|null;minutes:number|null;note:string|null;created_at:string; }
