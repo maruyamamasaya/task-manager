@@ -87,3 +87,15 @@ npm run dev
 既存プロジェクトではデプロイより先に `npx supabase db push` を実行し、`20260825020000_phase3_schedule_work_logs.sql` を適用してください。既存RLSは `user_id = auth.uid()` に加えて関連Taskの所有権も restrictive policy で検証し続けます。
 
 Reflection入力、Progress履歴、Analyticsグラフ、AI分析、通知、外部カレンダー連携は後続Phaseの範囲です。
+
+## Phase 4: 進捗管理・振り返り
+
+- `tasks.progress`（0〜100 の整数）を現在進捗の正本とします。保存操作時だけ `update_task_progress` RPC を呼び、Task 更新と `progress_logs` 追加を同一トランザクションで実行します。同率の再保存は no-op なので履歴を増やしません。
+- 進捗 0 / 1〜99 / 100 はそれぞれ `todo` / `doing` / `done`。100 到達時に `completed_at` を初回設定し、100 から下げると解除します。
+- 子Taskを持つ親の進捗は、直属の子Task（親自身の手動作業は含めない）の単純平均を四捨五入し、祖先まで再計算します。Tasks のサマリーは現在のフィルターに含まれる全Taskの単純平均です。
+- Reflection は Task ごとに1件です。`UNIQUE(task_id)` と upsert により再保存は編集になります。将来、複数回の振り返りが必要になった場合は履歴テーブルへの分離を Phase 5 以降で検討します。
+- `/reflections` は完了Task・Project・Work Log・Reflectionを4本の一括クエリで読み、メモリ上のMapで結合します（TaskごとのN+1なし）。振り返り済み一覧と未入力件数、予定・実績・差分を表示します。
+- Projects の進捗は、そのProjectに属する全Taskの `progress` 単純平均です。完了数 / 全Task数も併記します。
+- `20260825030000_phase4_progress_reflections.sql` はRPC、Reflection一意制約、履歴用indexを追加します。既存のrestrictive RLSにより、`user_id` に加えて関連Taskがログインユーザー所有であることを検証します。RPCも `auth.uid()` とRLSの両方を維持します。
+- Task Drawerでは明示的な保存を採用し、slider操作ごとのDB書き込みを避けます。Reflectionも明示保存のため、エラー時は入力を画面に保持して再試行できます。
+- Phase 5ではAnalytics、長期進捗トレンド、複数Reflection履歴、通知・AI支援を扱います。
