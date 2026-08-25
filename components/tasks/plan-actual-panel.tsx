@@ -1,8 +1,9 @@
 "use client";
-import { useEffect,useState,useTransition } from "react";
-import { addWorkLog,deleteWorkLog,startTimer,stopTimer,updateWorkLog } from "@/app/(app)/phase3-actions";
-import { actualRate,formatTokyo,scheduleMinutes,totalWorkMinutes,variance,varianceLabel } from "@/lib/time/phase3";
-import type { Task,TaskSchedule,WorkLog } from "@/types/database";
+import { useState,useTransition } from "react";
+import { addWorkLog } from "@/app/(app)/phase3-actions";
+import { totalWorkMinutes } from "@/lib/time/phase3";
+import type { Task,WorkLog } from "@/types/database";
+
 const button="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50";
 function Clock({start}:{start:string}){const [now,setNow]=useState(Date.now());useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(id)},[]);const seconds=Math.max(0,Math.floor((now-new Date(start).getTime())/1000));return <span className="font-mono">{[Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(n=>String(n).padStart(2,"0")).join(":")}</span>}
 export function PlanActualPanel({task,schedules,logs}:{task:Task;schedules:TaskSchedule[];logs:WorkLog[]}){const [pending,go]=useTransition(),[message,setMessage]=useState(""),[custom,setCustom]=useState(25),[note,setNote]=useState("");const actual=totalWorkMinutes(logs),diff=variance(actual,task.estimated_minutes),rate=actualRate(actual,task.estimated_minutes),scheduled=schedules.reduce((n,s)=>n+scheduleMinutes(s),0),running=logs.find(l=>!l.ended_at);const run=(p:Promise<{error?:string;ok?:boolean}>)=>go(async()=>{const r=await p;setMessage(r.error??"保存しました");if(!r.error)location.reload()});return <section className="mt-6 border-t pt-5"><h3 className="font-bold">予定・実績</h3><div className="mt-3 grid grid-cols-3 gap-2 text-center"><Metric label="予定" value={`${task.estimated_minutes??0}分`}/><Metric label="実績" value={`${actual}分`}/><Metric label="差分" value={varianceLabel(diff)} note={diff>0?"超過":diff<0?"短縮":"一致"}/></div><p className="mt-2 text-xs text-slate-500">予定比 {rate===null?"—":`${rate}%`} ・ スケジュール済み {scheduled}分 ・ 未配置 {Math.max(0,(task.estimated_minutes??0)-scheduled)}分</p>
