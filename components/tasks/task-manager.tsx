@@ -5,6 +5,7 @@ import {
   createTasks,
   deleteTask,
   importTasks,
+  saveProgress,
   updateTask,
   updateTaskOrder,
   type TaskInput,
@@ -452,6 +453,26 @@ export function TaskManager({
                     ),
                   )
                 }
+                onProgressChange={(node, progress) =>
+                  run(saveProgress(node.id, progress, ""), () =>
+                    setTasks((current) =>
+                      current.map((task) =>
+                        task.id === node.id
+                          ? {
+                              ...task,
+                              progress,
+                              status:
+                                progress === 100
+                                  ? "done"
+                                  : progress > 0
+                                    ? "doing"
+                                    : "todo",
+                            }
+                          : task,
+                      ),
+                    ),
+                  )
+                }
                 draggedTaskId={draggedTaskId}
                 dropTarget={dropTarget}
                 onDragStart={setDraggedTaskId}
@@ -535,6 +556,7 @@ function TaskRow({
   onSelect,
   onStatusChange,
   onPriorityChange,
+  onProgressChange,
   draggedTaskId,
   dropTarget,
   onDragStart,
@@ -555,6 +577,7 @@ function TaskRow({
   onSelect: (t: Task) => void;
   onStatusChange: (t: TaskNode, status: TaskStatus) => void;
   onPriorityChange: (t: TaskNode, priority: Task["priority"]) => void;
+  onProgressChange: (t: TaskNode, progress: number) => void;
   draggedTaskId: string | null;
   dropTarget: { id: string; edge: "before" | "after" } | null;
   onDragStart: (id: string | null) => void;
@@ -564,6 +587,8 @@ function TaskRow({
   onDueChange: (t: TaskNode, dueAt: string | null) => void;
   onDelete: (t: TaskNode) => void;
 }) {
+  const [progress, setProgress] = useState(node.progress);
+  useEffect(() => setProgress(node.progress), [node.progress]);
   const isFolder = folderTaskIds.has(node.id);
   const isScheduled = scheduledTaskIds.has(node.id);
   const statusClass = {
@@ -575,7 +600,13 @@ function TaskRow({
     <>
       <article
         draggable
-        onDragStart={() => onDragStart(node.id)}
+        onDragStart={(event) => {
+          if ((event.target as HTMLElement).closest("[data-progress-control]")) {
+            event.preventDefault();
+            return;
+          }
+          onDragStart(node.id);
+        }}
         onDragEnd={() => { onDragStart(null); onDragTarget(null); }}
         onDragOver={(event) => {
           event.preventDefault();
@@ -666,20 +697,49 @@ function TaskRow({
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   <div
-                    className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200"
-                    role="progressbar"
-                    aria-label={`${node.title}の進捗`}
+                    data-progress-control
+                    className="relative h-5 flex-1 cursor-pointer touch-none rounded-full bg-transparent py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+                    role="slider"
+                    tabIndex={0}
+                    aria-label={`${node.title}の進捗。クリックまたはドラッグで変更`}
                     aria-valuemin={0}
                     aria-valuemax={100}
-                    aria-valuenow={node.progress}
+                    aria-valuenow={progress}
+                    aria-valuetext={`${progress}%`}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      setProgress(Math.round(Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * 100));
+                    }}
+                    onPointerMove={(event) => {
+                      if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      setProgress(Math.round(Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * 100));
+                    }}
+                    onPointerUp={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      const next = Math.round(Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * 100);
+                      setProgress(next);
+                      event.currentTarget.releasePointerCapture(event.pointerId);
+                      if (next !== node.progress) onProgressChange(node, next);
+                    }}
+                    onKeyDown={(event) => {
+                      const step = event.shiftKey ? 10 : 1;
+                      const next = event.key === "Home" ? 0 : event.key === "End" ? 100 : event.key === "ArrowRight" || event.key === "ArrowUp" ? Math.min(100, progress + step) : event.key === "ArrowLeft" || event.key === "ArrowDown" ? Math.max(0, progress - step) : null;
+                      if (next === null) return;
+                      event.preventDefault();
+                      setProgress(next);
+                      if (next !== node.progress) onProgressChange(node, next);
+                    }}
                   >
-                    <div
-                      className="h-full rounded-full bg-emerald-500 transition-all"
-                      style={{ width: `${node.progress}%` }}
-                    />
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                      <div className="h-full rounded-full bg-emerald-500 transition-[width]" style={{ width: `${progress}%` }} />
+                    </div>
+                    <span aria-hidden="true" className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-emerald-600 opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" style={{ left: `${progress}%` }} />
                   </div>
                   <span className="w-9 text-right text-xs font-bold text-emerald-700">
-                    {node.progress}%
+                    {progress}%
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
@@ -732,6 +792,7 @@ function TaskRow({
           onSelect={onSelect}
           onStatusChange={onStatusChange}
           onPriorityChange={onPriorityChange}
+          onProgressChange={onProgressChange}
           draggedTaskId={draggedTaskId}
           dropTarget={dropTarget}
           onDragStart={onDragStart}
