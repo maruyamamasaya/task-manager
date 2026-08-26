@@ -33,16 +33,29 @@ export async function createWbsProject(form:FormData){
 
   let projectId:string|undefined;
   for(let attempt=1;attempt<=MAX_SHARE_CODE_ATTEMPTS;attempt++){
-    const {data,error}=await db.from("wbs_projects").insert({
-      owner_user_id:user.id,
+    const projectData={
+      id:crypto.randomUUID(),
       name,
       description:description||null,
       status:"active",
       share_code:generateShareCode(),
       join_mode:"approval",
-    }).select("id").single();
+    };
+    const insertData={
+      ...projectData,
+      owner_user_id:user.id,
+    };
 
-    if(!error){projectId=data.id;break;}
+    console.log("WBS INSERT CHECK",{
+      authUserId:user.id,
+      insertOwnerUserId:insertData.owner_user_id,
+      same:insertData.owner_user_id===user.id,
+    });
+
+    // Keep this as an INSERT-only request so SELECT policies cannot affect creation.
+    const {error}=await db.from("wbs_projects").insert(insertData);
+
+    if(!error){projectId=insertData.id;break;}
     if(error.code==="23505"&&attempt<MAX_SHARE_CODE_ATTEMPTS)continue;
 
     console.error("WBS create error:",error);
