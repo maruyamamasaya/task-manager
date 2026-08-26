@@ -146,6 +146,10 @@ export function TaskManager({
     () => new Set(tasks.flatMap((task) => task.parent_id ? [task.parent_id] : [])),
     [tasks],
   );
+  const scheduledTaskIds = useMemo(
+    () => new Set(schedules.map((schedule) => schedule.task_id)),
+    [schedules],
+  );
   const childCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const task of tasks) {
@@ -419,6 +423,7 @@ export function TaskManager({
                 key={n.id}
                 node={n}
                 folderTaskIds={folderTaskIds}
+                scheduledTaskIds={scheduledTaskIds}
                 childCounts={childCounts}
                 workLogs={workLogs}
                 runningTaskIds={runningTaskIds}
@@ -520,6 +525,7 @@ export function TaskManager({
 function TaskRow({
   node,
   folderTaskIds,
+  scheduledTaskIds,
   childCounts,
   projects,
   actual,
@@ -539,6 +545,7 @@ function TaskRow({
 }: {
   node: TaskNode;
   folderTaskIds: Set<string>;
+  scheduledTaskIds: Set<string>;
   childCounts: Map<string, number>;
   projects: Project[];
   actual: number;
@@ -557,6 +564,7 @@ function TaskRow({
   onDelete: (t: TaskNode) => void;
 }) {
   const isFolder = folderTaskIds.has(node.id);
+  const isScheduled = scheduledTaskIds.has(node.id);
   const statusClass = {
     todo: "bg-slate-100 text-slate-600",
     doing: "bg-amber-100 text-amber-700",
@@ -690,9 +698,10 @@ function TaskRow({
             {node.depth < 2 && (
               <button
                 onClick={() => onAdd(node.id)}
-                title="子タスクを追加"
+                disabled={isScheduled}
+                title={isScheduled ? "スケジュールに配置済みのため、子タスクを追加できません" : "子タスクを追加"}
                 aria-label={`${node.title}に子タスクを追加`}
-                className="grid h-8 w-8 place-items-center rounded border border-indigo-100 bg-indigo-50 text-lg font-semibold text-indigo-700 hover:bg-indigo-100"
+                className="grid h-8 w-8 place-items-center rounded border border-indigo-100 bg-indigo-50 text-lg font-semibold text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
               >
                 <span aria-hidden="true">↳＋</span>
               </button>
@@ -713,6 +722,7 @@ function TaskRow({
           key={c.id}
           node={c}
           folderTaskIds={folderTaskIds}
+          scheduledTaskIds={scheduledTaskIds}
           childCounts={childCounts}
           workLogs={workLogs}
           runningTaskIds={runningTaskIds}
