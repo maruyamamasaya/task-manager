@@ -9,7 +9,11 @@ import {
   updateTaskOrder,
   type TaskInput,
 } from "@/app/(app)/tasks/actions";
-import { buildTaskTree, type TaskNode } from "@/lib/tasks/tree";
+import {
+  buildTaskTree,
+  filterTaskHierarchy,
+  type TaskNode,
+} from "@/lib/tasks/tree";
 import { parseMarkdown, toMarkdown } from "@/lib/tasks/markdown";
 import type {
   Project,
@@ -83,8 +87,7 @@ export function TaskManager({
   const today = localDate(new Date().toISOString());
   const shown = useMemo(
     () =>
-      tasks
-        .filter((t) => {
+      filterTaskHierarchy(tasks, (t) => {
           const due = localDate(t.due_at);
           const matchesDate =
             dateFilter === "all" ||
@@ -123,6 +126,17 @@ export function TaskManager({
   const currentPage = Math.min(page, totalPages);
   const pagedTasks = useMemo(() => shown.slice((currentPage - 1) * TASKS_PER_PAGE, currentPage * TASKS_PER_PAGE), [shown, currentPage]);
   const tree = useMemo(() => buildTaskTree(pagedTasks), [pagedTasks]);
+  const folderTaskIds = useMemo(
+    () => new Set(tasks.flatMap((task) => task.parent_id ? [task.parent_id] : [])),
+    [tasks],
+  );
+  const childCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const task of tasks) {
+      if (task.parent_id) counts.set(task.parent_id, (counts.get(task.parent_id) ?? 0) + 1);
+    }
+    return counts;
+  }, [tasks]);
   const runningTaskIds = useMemo(
     () =>
       new Set(
@@ -388,6 +402,8 @@ export function TaskManager({
               <TaskRow
                 key={n.id}
                 node={n}
+                folderTaskIds={folderTaskIds}
+                childCounts={childCounts}
                 workLogs={workLogs}
                 runningTaskIds={runningTaskIds}
                 actual={totalWorkMinutes(
@@ -491,6 +507,8 @@ export function TaskManager({
 
 function TaskRow({
   node,
+  folderTaskIds,
+  childCounts,
   projects,
   actual,
   workLogs,
@@ -508,6 +526,8 @@ function TaskRow({
   onDelete,
 }: {
   node: TaskNode;
+  folderTaskIds: Set<string>;
+  childCounts: Map<string, number>;
   projects: Project[];
   actual: number;
   workLogs: WorkLog[];
@@ -524,7 +544,7 @@ function TaskRow({
   onDueChange: (t: TaskNode, dueAt: string | null) => void;
   onDelete: (t: TaskNode) => void;
 }) {
-  const isFolder = node.children.length > 0;
+  const isFolder = folderTaskIds.has(node.id);
   const statusClass = {
     todo: "bg-slate-100 text-slate-600",
     doing: "bg-amber-100 text-amber-700",
@@ -574,7 +594,7 @@ function TaskRow({
                 <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-bold text-indigo-700">
                   フォルダ
                 </span>
-                <span>{node.children.length}件の子タスク</span>
+                <span>{childCounts.get(node.id) ?? 0}件の子タスク</span>
               </div>
             ) : (
               <>
@@ -680,6 +700,8 @@ function TaskRow({
         <TaskRow
           key={c.id}
           node={c}
+          folderTaskIds={folderTaskIds}
+          childCounts={childCounts}
           workLogs={workLogs}
           runningTaskIds={runningTaskIds}
           actual={totalWorkMinutes(workLogs.filter((l) => l.task_id === c.id))}
