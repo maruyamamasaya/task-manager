@@ -29,6 +29,11 @@ import { addWorkLog, saveSchedule } from "@/app/(app)/phase3-actions";
 
 const statusLabel = { todo: "未着手", doing: "進行中", done: "完了" };
 const priorityLabel = { low: "低", medium: "中", high: "高" };
+const priorityClass = {
+  low: "border-sky-200 bg-sky-50 text-sky-700",
+  medium: "border-amber-200 bg-amber-50 text-amber-700",
+  high: "border-rose-200 bg-rose-50 text-rose-700",
+};
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-indigo-500 outline-none";
 function localDate(value: string | null) {
@@ -519,13 +524,17 @@ function TaskRow({
                   {runningTaskIds.has(node.id) && (
                     <span className="font-bold text-indigo-600">● 作業中</span>
                   )}
-                  <span>優先度 {priorityLabel[node.priority]}</span>
+                  <span
+                    className={`rounded-full border px-2.5 py-1 font-bold ${priorityClass[node.priority]}`}
+                  >
+                    優先度 {priorityLabel[node.priority]}
+                  </span>
                   {node.project_id && (
                     <span className="max-w-36 truncate">
                       {projects.find((p) => p.id === node.project_id)?.name}
                     </span>
                   )}
-                  <label className="flex items-center gap-1">
+                  <label className="flex items-center gap-1.5">
                     期限
                     <input
                       aria-label={`${node.title}の期限`}
@@ -541,7 +550,7 @@ function TaskRow({
                             : null,
                         )
                       }
-                      className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-600"
+                      className="min-h-8 min-w-32 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                     />
                   </label>
                 </div>
