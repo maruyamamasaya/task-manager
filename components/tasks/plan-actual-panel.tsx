@@ -1,16 +1,148 @@
 "use client";
-import { useEffect,useState,useTransition } from "react";
-import { addWorkLog,deleteWorkLog,startTimer,stopTimer,updateWorkLog } from "@/app/(app)/phase3-actions";
-import { actualRate,formatTokyo,scheduleMinutes,totalWorkMinutes,variance,varianceLabel } from "@/lib/time/phase3";
-import type { Task,TaskSchedule,WorkLog } from "@/types/database";
-import { DatabaseUpdating } from "@/components/ui/database-updating";
 
-const button="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50";
-function Clock({start}:{start:string}){const [now,setNow]=useState(Date.now());useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(id)},[]);const seconds=Math.max(0,Math.floor((now-new Date(start).getTime())/1000));return <span className="font-mono">{[Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(n=>String(n).padStart(2,"0")).join(":")}</span>}
-export function PlanActualPanel({task,schedules,logs}:{task:Task;schedules:TaskSchedule[];logs:WorkLog[]}){const [pending,go]=useTransition(),[message,setMessage]=useState(""),[custom,setCustom]=useState(25),[note,setNote]=useState("");const actual=totalWorkMinutes(logs),diff=variance(actual,task.estimated_minutes),rate=actualRate(actual,task.estimated_minutes),scheduled=schedules.reduce((n,s)=>n+scheduleMinutes(s),0),running=logs.find(l=>!l.ended_at);const run=(p:Promise<{error?:string;ok?:boolean}>)=>go(async()=>{const r=await p;setMessage(r.error??"保存しました");if(!r.error)location.reload()});return <section className="mt-6 border-t pt-5"><DatabaseUpdating active={pending} /><h3 className="font-bold">予定・実績</h3><div className="mt-3 grid grid-cols-3 gap-2 text-center"><Metric label="予定" value={`${task.estimated_minutes??0}分`}/><Metric label="実績" value={`${actual}分`}/><Metric label="差分" value={varianceLabel(diff)} note={diff>0?"超過":diff<0?"短縮":"一致"}/></div><p className="mt-2 text-xs text-slate-500">予定比 {rate===null?"—":`${rate}%`} ・ スケジュール済み {scheduled}分 ・ 未配置 {Math.max(0,(task.estimated_minutes??0)-scheduled)}分</p>
-{running?<div className="mt-4 rounded-xl bg-amber-50 p-4"><p className="font-semibold">● 作業中 <Clock start={running.started_at}/></p><input value={note} onChange={e=>setNote(e.target.value)} placeholder="何をしたか（任意）" className="mt-2 w-full rounded-lg border bg-white px-3 py-2 text-sm"/><button disabled={pending} onClick={()=>run(stopTimer(running.id,note))} className="mt-2 rounded-lg bg-slate-800 px-4 py-2 text-sm text-white">■ 作業終了</button></div>:<button disabled={pending} onClick={()=>run(startTimer(task.id))} className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">▶ 作業開始</button>}
-<div className="mt-4"><p className="text-sm font-semibold">実績を追加</p><div className="mt-2 flex flex-wrap gap-2">{[15,30,60].map(m=><button className={button} disabled={pending} key={m} onClick={()=>run(addWorkLog(task.id,m))}>+{m}分</button>)}<input aria-label="任意の分数" type="number" min="1" value={custom} onChange={e=>setCustom(Number(e.target.value))} className="w-20 rounded-lg border px-2 text-sm"/><button className={button} disabled={pending} onClick={()=>run(addWorkLog(task.id,custom))}>追加</button></div></div>
-<div className="mt-5"><p className="text-sm font-semibold">スケジュール</p>{schedules.length?schedules.map(s=><p className="mt-2 text-sm" key={s.id}>{formatTokyo(s.start_at,{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}〜{formatTokyo(s.end_at,{hour:"2-digit",minute:"2-digit"})}（{scheduleMinutes(s)}分）</p>):<p className="mt-2 text-sm text-slate-400">予定はまだ配置されていません</p>}</div>
-<div className="mt-5"><p className="text-sm font-semibold">作業履歴</p>{logs.filter(l=>l.ended_at).length?logs.filter(l=>l.ended_at).map(l=><LogRow key={l.id} log={l} run={run}/>):<p className="mt-2 text-sm text-slate-400">まだ作業記録がありません</p>}</div>{message&&<p role="status" className={`mt-3 text-sm ${message==="保存しました"?"text-emerald-700":"text-red-600"}`}>{message}</p>}</section>}
-function Metric({label,value,note}:{label:string;value:string;note?:string}){return <div className="rounded-lg bg-slate-50 p-2"><p className="text-xs text-slate-500">{label}</p><p className="font-bold">{value}</p>{note&&<p className="text-xs">{note}</p>}</div>}
-function LogRow({log,run}:{log:WorkLog;run:(p:Promise<{error?:string;ok?:boolean}>)=>void}){const edit=()=>{const minutes=Number(prompt("分数",String(log.minutes??0)));if(!minutes||!log.ended_at)return;const end=new Date(log.ended_at),start=new Date(end.getTime()-minutes*60000),note=prompt("何をしたか",log.note??"")??log.note??"";run(updateWorkLog(log.id,{startedAt:start.toISOString(),endedAt:end.toISOString(),note}))};return <div className="mt-2 rounded-lg border p-3 text-sm"><div className="flex items-center gap-2"><span className="flex-1">{formatTokyo(log.started_at,{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}〜{formatTokyo(log.ended_at!,{hour:"2-digit",minute:"2-digit"})} <b>{log.minutes??0}分</b></span><button onClick={edit}>編集</button><button className="text-red-600" onClick={()=>run(deleteWorkLog(log.id))}>削除</button></div>{log.note&&<p className="mt-1 text-slate-500">{log.note}</p>}</div>}
+import { useState } from "react";
+import {
+  actualRate,
+  formatTokyo,
+  overlaps,
+  scheduleMinutes,
+  tokyoDateTime,
+  totalWorkMinutes,
+  variance,
+  varianceLabel,
+} from "@/lib/time/phase3";
+import type { Task, TaskSchedule, WorkLog } from "@/types/database";
+
+const button =
+  "rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50";
+type NewSchedule = { startAt: string; endAt: string };
+
+function todayInTokyo() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+export function PlanActualPanel({
+  task,
+  schedules,
+  allSchedules,
+  logs,
+  actualMinutes,
+  onActualMinutesChange,
+  newSchedules,
+  onSchedulesChange,
+}: {
+  task: Task;
+  schedules: TaskSchedule[];
+  allSchedules: TaskSchedule[];
+  logs: WorkLog[];
+  actualMinutes: number[];
+  onActualMinutesChange: (minutes: number[]) => void;
+  newSchedules: NewSchedule[];
+  onSchedulesChange: (schedules: NewSchedule[]) => void;
+}) {
+  const [custom, setCustom] = useState(25);
+  const [date, setDate] = useState(todayInTokyo);
+  const [start, setStart] = useState("09:00");
+  const [end, setEnd] = useState("10:00");
+  const existingActual = totalWorkMinutes(logs);
+  const stagedActual = actualMinutes.reduce((sum, minutes) => sum + minutes, 0);
+  const actual = existingActual + stagedActual;
+  const diff = variance(actual, task.estimated_minutes);
+  const rate = actualRate(actual, task.estimated_minutes);
+  const scheduled = [...schedules, ...newSchedules].reduce(
+    (sum, schedule) => sum + scheduleMinutes({
+      start_at: "start_at" in schedule ? schedule.start_at : schedule.startAt,
+      end_at: "end_at" in schedule ? schedule.end_at : schedule.endAt,
+    }),
+    0,
+  );
+
+  const addActual = (minutes: number) => {
+    if (Number.isInteger(minutes) && minutes > 0) {
+      onActualMinutesChange([...actualMinutes, minutes]);
+    }
+  };
+  const candidate = date && start && end
+    ? { startAt: tokyoDateTime(date, start), endAt: tokyoDateTime(date, end) }
+    : null;
+  const invalidSchedule = candidate
+    ? new Date(candidate.startAt) >= new Date(candidate.endAt)
+    : false;
+  const candidateConflict = candidate
+    ? [...allSchedules, ...newSchedules.map((item, index) => ({
+        id: `new-${index}`,
+        task_id: task.id,
+        user_id: task.user_id,
+        start_at: item.startAt,
+        end_at: item.endAt,
+        created_at: item.startAt,
+      }))].some((schedule) => overlaps(
+        { start_at: candidate.startAt, end_at: candidate.endAt },
+        schedule,
+      ))
+    : false;
+
+  return (
+    <section className="mt-6 border-t pt-5">
+      <h3 className="font-bold">予定・実績</h3>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        <Metric label="予定" value={`${task.estimated_minutes ?? 0}分`} />
+        <Metric label="実績" value={`${actual}分`} note={stagedActual ? `保存待ち +${stagedActual}分` : undefined} />
+        <Metric label="差分" value={varianceLabel(diff)} note={diff > 0 ? "超過" : diff < 0 ? "短縮" : "一致"} />
+      </div>
+      <p className="mt-2 text-xs text-slate-500">
+        予定比 {rate === null ? "—" : `${rate}%`} ・ スケジュール済み {scheduled}分 ・ 未配置 {Math.max(0, (task.estimated_minutes ?? 0) - scheduled)}分
+      </p>
+
+      <div className="mt-4">
+        <p className="text-sm font-semibold">実績を追加</p>
+        <p className="mt-1 text-xs text-slate-500">追加内容は「保存」を押すまで反映されません。</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {[15, 30, 60].map((minutes) => (
+            <button type="button" className={button} key={minutes} onClick={() => addActual(minutes)}>+{minutes}分</button>
+          ))}
+          <input aria-label="任意の分数" type="number" min="1" value={custom} onChange={(event) => setCustom(Number(event.target.value))} className="w-20 rounded-lg border px-2 text-sm" />
+          <button type="button" className={button} onClick={() => addActual(custom)}>追加</button>
+          {actualMinutes.length > 0 && <button type="button" className="px-2 text-sm text-slate-500" onClick={() => onActualMinutesChange([])}>取り消す</button>}
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <p className="text-sm font-semibold">スケジュール予定</p>
+        <p className="mt-1 text-xs text-slate-500">日時を指定して、保存待ちの予定に追加できます。</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          <input aria-label="予定日" type="date" value={date} onChange={(event) => setDate(event.target.value)} className="rounded-lg border px-3 py-2 text-sm" />
+          <input aria-label="開始時刻" type="time" value={start} onChange={(event) => setStart(event.target.value)} className="rounded-lg border px-3 py-2 text-sm" />
+          <input aria-label="終了時刻" type="time" value={end} onChange={(event) => setEnd(event.target.value)} className="rounded-lg border px-3 py-2 text-sm" />
+        </div>
+        {invalidSchedule && <p role="alert" className="mt-2 text-sm font-semibold text-red-600">終了時刻は開始時刻より後にしてください。</p>}
+        {!invalidSchedule && candidateConflict && <p role="alert" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">⚠ この時間帯は別のスケジュールと重複しています。</p>}
+        <button
+          type="button"
+          disabled={!candidate || invalidSchedule}
+          onClick={() => candidate && onSchedulesChange([...newSchedules, candidate])}
+          className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 disabled:opacity-50"
+        >
+          ＋ 保存待ちの予定に追加
+        </button>
+        {[...schedules.map((schedule) => ({ startAt: schedule.start_at, endAt: schedule.end_at, saved: true })), ...newSchedules.map((schedule) => ({ ...schedule, saved: false }))].map((schedule, index, items) => {
+          const conflict = items.some((other, otherIndex) => otherIndex !== index && overlaps({ start_at: schedule.startAt, end_at: schedule.endAt }, { start_at: other.startAt, end_at: other.endAt })) || allSchedules.some((other) => other.task_id !== task.id && overlaps({ start_at: schedule.startAt, end_at: schedule.endAt }, other));
+          return <div className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${conflict ? "bg-amber-50 text-amber-800" : "bg-slate-50"}`} key={`${schedule.startAt}-${index}`}>
+            <span className="flex-1">{formatTokyo(schedule.startAt, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}〜{formatTokyo(schedule.endAt, { hour: "2-digit", minute: "2-digit" })}（{scheduleMinutes({ start_at: schedule.startAt, end_at: schedule.endAt })}分）{conflict ? " · 重複あり" : ""}{!schedule.saved ? " · 保存待ち" : ""}</span>
+            {!schedule.saved && <button type="button" className="text-red-600" onClick={() => onSchedulesChange(newSchedules.filter((_, newIndex) => newIndex !== index - schedules.length))}>削除</button>}
+          </div>;
+        })}
+        {!schedules.length && !newSchedules.length && <p className="mt-2 text-sm text-slate-400">予定はまだ配置されていません</p>}
+      </div>
+    </section>
+  );
+}
+
+function Metric({ label, value, note }: { label: string; value: string; note?: string }) {
+  return <div className="rounded-lg bg-slate-50 p-2"><p className="text-xs text-slate-500">{label}</p><p className="font-bold">{value}</p>{note && <p className="text-xs text-indigo-600">{note}</p>}</div>;
+}

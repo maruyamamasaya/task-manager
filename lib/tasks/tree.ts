@@ -5,9 +5,7 @@ export type TaskNode = Task & { children: TaskNode[]; depth: number };
 export function clampProgress(value: number) { return Math.min(100, Math.max(0, Math.round(Number.isFinite(value) ? value : 0))); }
 
 export function normalizeState(status: TaskStatus, progress: number): { status: TaskStatus; progress: number } {
-  const safe = clampProgress(progress);
-  if (status === "done" || safe === 100) return { status: "done", progress: 100 };
-  return { status: safe > 0 && status === "todo" ? "doing" : status, progress: safe };
+  return { status, progress: clampProgress(progress) };
 }
 
 export function buildTaskTree(tasks: Task[]): TaskNode[] {

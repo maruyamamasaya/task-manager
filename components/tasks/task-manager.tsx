@@ -25,6 +25,7 @@ import { totalWorkMinutes } from "@/lib/time/phase3";
 import { ProgressReflectionPanel } from "./progress-reflection-panel";
 import { averageProgress } from "@/lib/tasks/phase4";
 import { DatabaseUpdating } from "@/components/ui/database-updating";
+import { addWorkLog, saveSchedule } from "@/app/(app)/phase3-actions";
 
 const statusLabel = { todo: "未着手", doing: "進行中", done: "完了" };
 const priorityLabel = { low: "低", medium: "中", high: "高" };
@@ -363,7 +364,7 @@ export function TaskManager({
                           ? {
                               ...t,
                               status: done ? "done" : "todo",
-                              progress: done ? 100 : 0,
+                              progress: t.progress,
                             }
                           : t,
                       ),
@@ -401,9 +402,22 @@ export function TaskManager({
           task={selected}
           projects={projects}
           schedules={schedules.filter((s) => s.task_id === selected.id)}
+          allSchedules={schedules}
           logs={workLogs.filter((l) => l.task_id === selected.id)}
           onClose={() => setSelected(null)}
-          onSave={(input) => run(updateTask(selected.id, input))}
+          onSave={(input, actualMinutes, newSchedules) =>
+            run(
+              Promise.all([
+                updateTask(selected.id, input),
+                ...actualMinutes.map((minutes) => addWorkLog(selected.id, minutes)),
+                ...newSchedules.map((schedule) =>
+                  saveSchedule({ taskId: selected.id, ...schedule }),
+                ),
+              ]).then((results) =>
+                results.find((result) => result.error) ?? { ok: true },
+              ),
+            )
+          }
           history={progressLogs.filter((l) => l.task_id === selected.id)}
           reflection={
             reflections.find((r) => r.task_id === selected.id) ?? null
@@ -606,6 +620,7 @@ function TaskDrawer({
   isFolder,
   projects,
   schedules,
+  allSchedules,
   logs,
   history,
   reflection,
@@ -616,13 +631,22 @@ function TaskDrawer({
   isFolder: boolean;
   projects: Project[];
   schedules: TaskSchedule[];
+  allSchedules: TaskSchedule[];
   logs: WorkLog[];
   history: ProgressLog[];
   reflection: Reflection | null;
   onClose: () => void;
-  onSave: (i: TaskInput) => void;
+  onSave: (
+    i: TaskInput,
+    actualMinutes: number[],
+    schedules: { startAt: string; endAt: string }[],
+  ) => void;
 }) {
   const [form, setForm] = useState({ ...task, due_at: localDate(task.due_at) });
+  const [actualMinutes, setActualMinutes] = useState<number[]>([]);
+  const [newSchedules, setNewSchedules] = useState<
+    { startAt: string; endAt: string }[]
+  >([]);
   const set = (key: string, value: unknown) =>
     setForm((f) => ({ ...f, [key]: value }));
   return (
@@ -651,14 +675,19 @@ function TaskDrawer({
           </button>
         </div>
         <form
+          id="task-detail-form"
           onSubmit={(e) => {
             e.preventDefault();
-            onSave({
-              ...form,
-              due_at: form.due_at
-                ? new Date(`${form.due_at}T23:59:59`).toISOString()
-                : null,
-            });
+            onSave(
+              {
+                ...form,
+                due_at: form.due_at
+                  ? new Date(`${form.due_at}T23:59:59`).toISOString()
+                  : null,
+              },
+              actualMinutes,
+              newSchedules,
+            );
             onClose();
           }}
           className="mt-6 space-y-4"
@@ -775,12 +804,28 @@ function TaskDrawer({
         </form>
         {!isFolder && (
           <>
-            <PlanActualPanel task={task} schedules={schedules} logs={logs} />
+            <PlanActualPanel
+              task={task}
+              schedules={schedules}
+              allSchedules={allSchedules}
+              logs={logs}
+              actualMinutes={actualMinutes}
+              onActualMinutesChange={setActualMinutes}
+              newSchedules={newSchedules}
+              onSchedulesChange={setNewSchedules}
+            />
             <ProgressReflectionPanel
               task={task}
               history={history}
               reflection={reflection}
             />
+            <button
+              type="submit"
+              form="task-detail-form"
+              className="mt-6 w-full rounded-lg bg-indigo-600 py-2.5 font-semibold text-white"
+            >
+              変更内容をすべて保存
+            </button>
           </>
         )}
       </section>
