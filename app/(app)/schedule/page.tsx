@@ -42,6 +42,7 @@ export default async function Page({
     { data: tasks },
     { data: projects },
     { data: schedules, error },
+    { data: meetings, error: meetingError },
     { data: logs },
     { data: dayOffs, error: dayOffError },
   ] = await Promise.all([
@@ -56,6 +57,7 @@ export default async function Page({
       .gte("start_at", bounds.start)
       .lt("start_at", bounds.end)
       .order("start_at"),
+    db.from("meetings").select("*").gte("start_at", bounds.start).lt("start_at", bounds.end).order("start_at"),
     view === "day"
       ? db
           .from("work_logs")
@@ -69,7 +71,7 @@ export default async function Page({
       .gte("off_date", offStart)
       .lte("off_date", offEnd),
   ]);
-  if (error || dayOffError) throw error ?? dayOffError;
+  if (error || meetingError || dayOffError) throw error ?? meetingError ?? dayOffError;
   const weekday = new Intl.DateTimeFormat("ja-JP", {
     weekday: "short",
     timeZone: "Asia/Tokyo",
@@ -132,6 +134,7 @@ export default async function Page({
           )}
           projects={projects ?? []}
           schedules={schedules ?? []}
+          meetings={meetings ?? []}
           logs={logs ?? []}
           dayOff={dayOffs?.[0]}
         />
@@ -141,6 +144,7 @@ export default async function Page({
           date={date}
           tasks={tasks ?? []}
           schedules={schedules ?? []}
+          meetings={meetings ?? []}
           dayOffs={dayOffs ?? []}
         />
       )}
