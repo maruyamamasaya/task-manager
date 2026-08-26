@@ -77,6 +77,10 @@ export function TaskManager({
   const [importOpen, setImportOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    id: string;
+    edge: "before" | "after";
+  } | null>(null);
   const [markdown, setMarkdown] = useState("");
   const [pending, startTransition] = useTransition();
   const today = localDate(new Date().toISOString());
@@ -169,7 +173,7 @@ export function TaskManager({
       ),
     );
   };
-  const moveTask = (draggedId: string, targetId: string) => {
+  const moveTask = (draggedId: string, targetId: string, edge: "before" | "after") => {
     if (draggedId === targetId) return;
     const dragged = tasks.find((task) => task.id === draggedId);
     const target = tasks.find((task) => task.id === targetId);
@@ -185,7 +189,8 @@ export function TaskManager({
           a.created_at.localeCompare(b.created_at),
       );
     const reordered = siblings.filter((task) => task.id !== draggedId);
-    reordered.splice(reordered.findIndex((task) => task.id === targetId), 0, dragged);
+    const targetIndex = reordered.findIndex((task) => task.id === targetId);
+    reordered.splice(targetIndex + (edge === "after" ? 1 : 0), 0, dragged);
     const order = new Map(reordered.map((task, index) => [task.id, index]));
     setSort("manual");
     run(updateTaskOrder(reordered.map((task) => task.id)), () =>
@@ -414,10 +419,13 @@ export function TaskManager({
                   )
                 }
                 draggedTaskId={draggedTaskId}
+                dropTarget={dropTarget}
                 onDragStart={setDraggedTaskId}
-                onDrop={(targetId) => {
-                  if (draggedTaskId) moveTask(draggedTaskId, targetId);
+                onDragTarget={setDropTarget}
+                onDrop={(targetId, edge) => {
+                  if (draggedTaskId) moveTask(draggedTaskId, targetId, edge);
                   setDraggedTaskId(null);
+                  setDropTarget(null);
                 }}
                 onAdd={add}
                 onDueChange={(node, due_at) =>
@@ -495,7 +503,9 @@ function TaskRow({
   onStatusChange,
   onPriorityChange,
   draggedTaskId,
+  dropTarget,
   onDragStart,
+  onDragTarget,
   onDrop,
   onAdd,
   onDueChange,
@@ -510,8 +520,10 @@ function TaskRow({
   onStatusChange: (t: TaskNode, status: TaskStatus) => void;
   onPriorityChange: (t: TaskNode, priority: Task["priority"]) => void;
   draggedTaskId: string | null;
+  dropTarget: { id: string; edge: "before" | "after" } | null;
   onDragStart: (id: string | null) => void;
-  onDrop: (id: string) => void;
+  onDragTarget: (target: { id: string; edge: "before" | "after" } | null) => void;
+  onDrop: (id: string, edge: "before" | "after") => void;
   onAdd: (id: string) => void;
   onDueChange: (t: TaskNode, dueAt: string | null) => void;
   onDelete: (t: TaskNode) => void;
@@ -527,14 +539,22 @@ function TaskRow({
       <article
         draggable
         onDragStart={() => onDragStart(node.id)}
-        onDragEnd={() => onDragStart(null)}
-        onDragOver={(event) => event.preventDefault()}
+        onDragEnd={() => { onDragStart(null); onDragTarget(null); }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          const rect = event.currentTarget.getBoundingClientRect();
+          onDragTarget({ id: node.id, edge: event.clientY < rect.top + rect.height / 2 ? "before" : "after" });
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onDragTarget(null);
+        }}
         onDrop={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          onDrop(node.id);
+          const rect = event.currentTarget.getBoundingClientRect();
+          onDrop(node.id, event.clientY < rect.top + rect.height / 2 ? "before" : "after");
         }}
-        className={`group border-b border-slate-100 px-3 py-3 hover:bg-slate-50 ${node.status === "done" ? "opacity-60" : ""} ${draggedTaskId === node.id ? "bg-indigo-50 opacity-50" : ""}`}
+        className={`task-sort-row group relative border-b border-slate-100 px-3 py-3 hover:bg-slate-50 ${node.status === "done" ? "opacity-60" : ""} ${draggedTaskId === node.id ? "bg-indigo-50 opacity-50" : ""} ${dropTarget?.id === node.id && draggedTaskId !== node.id ? `is-drop-${dropTarget.edge}` : ""}`}
         style={{ paddingLeft: `${12 + node.depth * 24}px` }}
       >
         <div className="flex items-start gap-3">
@@ -563,35 +583,25 @@ function TaskRow({
             ) : (
               <>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onStatusChange(
-                        node,
-                        ({ todo: "doing", doing: "done", done: "todo" } as const)[node.status],
-                      )
-                    }
+                  <select
+                    value={node.status}
+                    onChange={(event) => onStatusChange(node, event.target.value as TaskStatus)}
                     aria-label={`${node.title}のステータスを変更`}
-                    className={`rounded-full px-2 py-0.5 font-bold ${statusClass}`}
+                    className={`cursor-pointer rounded-full border-0 py-1 pl-2.5 pr-2 font-bold ${statusClass}`}
                   >
-                    {statusLabel[node.status]}
-                  </button>
+                    {(Object.keys(statusLabel) as TaskStatus[]).map((status) => <option key={status} value={status}>{statusLabel[status]}</option>)}
+                  </select>
                   {runningTaskIds.has(node.id) && (
                     <span className="font-bold text-indigo-600">● 作業中</span>
                   )}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onPriorityChange(
-                        node,
-                        ({ high: "medium", medium: "low", low: "high" } as const)[node.priority],
-                      )
-                    }
+                  <select
+                    value={node.priority}
+                    onChange={(event) => onPriorityChange(node, event.target.value as Task["priority"])}
                     aria-label={`${node.title}の優先度を変更`}
-                    className={`rounded-full border px-2.5 py-1 font-bold ${priorityClass[node.priority]}`}
+                    className={`cursor-pointer rounded-full border py-1 pl-2.5 pr-2 font-bold ${priorityClass[node.priority]}`}
                   >
-                    優先度 {priorityLabel[node.priority]}
-                  </button>
+                    {(Object.keys(priorityLabel) as Task["priority"][]).map((value) => <option key={value} value={value}>優先度 {priorityLabel[value]}</option>)}
+                  </select>
                   {node.project_id && (
                     <span className="max-w-36 truncate">
                       {projects.find((p) => p.id === node.project_id)?.name}
@@ -652,9 +662,11 @@ function TaskRow({
             {node.depth < 2 && (
               <button
                 onClick={() => onAdd(node.id)}
-                className="rounded border border-indigo-100 bg-indigo-50 px-2 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                title="子タスクを追加"
+                aria-label={`${node.title}に子タスクを追加`}
+                className="grid h-8 w-8 place-items-center rounded border border-indigo-100 bg-indigo-50 text-lg font-semibold text-indigo-700 hover:bg-indigo-100"
               >
-                子タスクを追加
+                <span aria-hidden="true">↳＋</span>
               </button>
             )}
             <button
@@ -680,7 +692,9 @@ function TaskRow({
           onStatusChange={onStatusChange}
           onPriorityChange={onPriorityChange}
           draggedTaskId={draggedTaskId}
+          dropTarget={dropTarget}
           onDragStart={onDragStart}
+          onDragTarget={onDragTarget}
           onDrop={onDrop}
           onAdd={onAdd}
           onDueChange={onDueChange}
