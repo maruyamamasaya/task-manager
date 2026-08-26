@@ -27,7 +27,7 @@ import { PlanActualPanel } from "./plan-actual-panel";
 import { totalWorkMinutes } from "@/lib/time/phase3";
 import { ProgressReflectionPanel } from "./progress-reflection-panel";
 import { DatabaseUpdating } from "@/components/ui/database-updating";
-import { addWorkLog, saveSchedule } from "@/app/(app)/phase3-actions";
+import { addWorkLog } from "@/app/(app)/phase3-actions";
 import { Pagination } from "@/components/ui/pagination";
 
 const TASKS_PER_PAGE = 40;
@@ -472,17 +472,13 @@ export function TaskManager({
           task={selected}
           projects={projects}
           schedules={schedules.filter((s) => s.task_id === selected.id)}
-          allSchedules={schedules}
           logs={workLogs.filter((l) => l.task_id === selected.id)}
           onClose={() => setSelected(null)}
-          onSave={(input, actualMinutes, newSchedules) =>
+          onSave={(input, actualMinutes) =>
             run(
               Promise.all([
                 updateTask(selected.id, input),
                 ...actualMinutes.map((minutes) => addWorkLog(selected.id, minutes)),
-                ...newSchedules.map((schedule) =>
-                  saveSchedule({ taskId: selected.id, ...schedule }),
-                ),
               ]).then((results) =>
                 results.find((result) => result.error) ?? { ok: true },
               ),
@@ -728,7 +724,6 @@ function TaskDrawer({
   isFolder,
   projects,
   schedules,
-  allSchedules,
   logs,
   reflection,
   onClose,
@@ -738,21 +733,16 @@ function TaskDrawer({
   isFolder: boolean;
   projects: Project[];
   schedules: TaskSchedule[];
-  allSchedules: TaskSchedule[];
   logs: WorkLog[];
   reflection: Reflection | null;
   onClose: () => void;
   onSave: (
     i: TaskInput,
     actualMinutes: number[],
-    schedules: { startAt: string; endAt: string }[],
   ) => void;
 }) {
   const [form, setForm] = useState({ ...task, due_at: localDate(task.due_at) });
   const [actualMinutes, setActualMinutes] = useState<number[]>([]);
-  const [newSchedules, setNewSchedules] = useState<
-    { startAt: string; endAt: string }[]
-  >([]);
   const set = (key: string, value: unknown) =>
     setForm((f) => ({ ...f, [key]: value }));
   return (
@@ -792,7 +782,6 @@ function TaskDrawer({
                   : null,
               },
               actualMinutes,
-              newSchedules,
             );
             onClose();
           }}
@@ -856,17 +845,6 @@ function TaskDrawer({
                     ))}
                   </select>
                 </Field>
-                <Field label={`進捗 ${form.progress}%`}>
-                  <input
-                    aria-label="タスク進捗スライダー"
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={form.progress}
-                    onChange={(e) => set("progress", Number(e.target.value))}
-                    className="block w-full accent-indigo-600"
-                  />
-                </Field>
                 <Field label="予定時間 (分)">
                   <input
                     type="number"
@@ -913,12 +891,9 @@ function TaskDrawer({
             <PlanActualPanel
               task={task}
               schedules={schedules}
-              allSchedules={allSchedules}
               logs={logs}
               actualMinutes={actualMinutes}
               onActualMinutesChange={setActualMinutes}
-              newSchedules={newSchedules}
-              onSchedulesChange={setNewSchedules}
             />
             <ProgressReflectionPanel
               task={task}

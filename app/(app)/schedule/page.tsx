@@ -128,7 +128,6 @@ export default async function Page({
           date={date}
           tasks={(tasks ?? []).filter(
             (t) =>
-              t.status !== "done" &&
               !(tasks ?? []).some((child) => child.parent_id === t.id),
           )}
           projects={projects ?? []}
