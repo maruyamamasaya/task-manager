@@ -1,25 +1,4 @@
-import { PageHeader } from "@/components/ui/page-header";
-
-export default function WbsPage() {
-  return (
-    <>
-      <PageHeader
-        title="WBS"
-        description="プロジェクトの作業を構造化して管理します。"
-      />
-      <section
-        aria-label="WBSワークスペース"
-        className="min-h-[28rem] rounded-2xl border border-slate-200 bg-white shadow-sm"
-      >
-        <div className="grid min-h-[28rem] place-items-center p-8 text-center">
-          <div>
-            <p className="font-semibold text-slate-700">WBSページは準備中です</p>
-            <p className="mt-2 text-sm text-slate-500">
-              ここにプロジェクトのWBSを表示します。
-            </p>
-          </div>
-        </div>
-      </section>
-    </>
-  );
-}
+import Link from "next/link"; import { PageHeader } from "@/components/ui/page-header"; import { createClient } from "@/lib/supabase/server"; import { leafProgress } from "@/lib/wbs/hierarchy"; import type { WbsItem,WbsProject,WbsProjectRole } from "@/lib/wbs/types"; import { WbsProjectList } from "@/components/wbs/wbs-project-list";
+export default async function WbsPage(){const db=await createClient();const {data:{user}}=await db.auth.getUser();const [{data:projects,error},{data:members},{data:items}]=await Promise.all([db.from("wbs_projects").select("*").order("updated_at",{ascending:false}),db.from("wbs_project_members").select("project_id,role").eq("user_id",user!.id),db.from("wbs_items").select("*")]);
+const memberRoles=new Map((members??[]).map(m=>[m.project_id,m.role as WbsProjectRole]));const summaries=((projects??[]) as WbsProject[]).map(project=>{const projectItems=(items??[] as WbsItem[]).filter(i=>i.project_id===project.id);return {...project,role:project.owner_user_id===user!.id?"owner" as const:memberRoles.get(project.id)??"viewer",itemCount:projectItems.length,progress:leafProgress(projectItems)}});
+return <><PageHeader title="WBS" description="プロジェクトの作業を階層化し、チームで安全に共有します。" action={<Link href="/wbs/new" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">＋ 新規WBS</Link>}/>{error?<p className="rounded-xl bg-red-50 p-4 text-red-700">WBSを読み込めませんでした。</p>:<WbsProjectList projects={summaries}/>}</>}
