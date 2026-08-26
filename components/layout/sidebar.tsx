@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/app/(auth)/login/actions";
 
 const allItems = [
-  ["Dashboard", "/dashboard", "⌂"], ["Today", "/today", "◉"], ["Tasks", "/tasks", "✓"],
-  ["Schedule", "/schedule", "▤"], ["休日設定", "/holidays", "休"], ["Projects", "/projects", "◇"], ["Reflections", "/reflections", "↻"], ["Analytics", "/analytics", "⌁"],
+  ["Dashboard", "/dashboard", "⌂"], ["今日の予定", "/today", "◉"], ["タスク", "/tasks", "✓"],
+  ["スケジュール", "/schedule", "▤"], ["休日設定", "/holidays", "休"], ["プロジェクト", "/projects", "◇"], ["振り返り", "/reflections", "↻"], ["Analytics", "/analytics", "⌁"],
 ] as const;
 
 // Dashboard and Analytics will return in a future version. Keep their definitions
