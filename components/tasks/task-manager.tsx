@@ -26,6 +26,9 @@ import { ProgressReflectionPanel } from "./progress-reflection-panel";
 import { averageProgress } from "@/lib/tasks/phase4";
 import { DatabaseUpdating } from "@/components/ui/database-updating";
 import { addWorkLog, saveSchedule } from "@/app/(app)/phase3-actions";
+import { Pagination } from "@/components/ui/pagination";
+
+const TASKS_PER_PAGE = 40;
 
 const statusLabel = { todo: "未着手", doing: "進行中", done: "完了" };
 const priorityLabel = { low: "低", medium: "中", high: "高" };
@@ -65,6 +68,8 @@ export function TaskManager({
   const [project, setProject] = useState("");
   const [priority, setPriority] = useState("");
   const [sort, setSort] = useState("created");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Task | null>(
     initialTasks.find((t) => t.id === initialTaskId) ?? null,
   );
@@ -97,17 +102,23 @@ export function TaskManager({
             (!priority || t.priority === priority)
           );
         })
-        .sort((a, b) =>
-          sort === "due"
+        .sort((a, b) => {
+          const result = sort === "title"
+            ? a.title.localeCompare(b.title, "ja")
+            : sort === "due"
             ? (a.due_at ?? "9999").localeCompare(b.due_at ?? "9999")
             : sort === "priority"
               ? { high: 0, medium: 1, low: 2 }[a.priority] -
                 { high: 0, medium: 1, low: 2 }[b.priority]
-              : a.created_at.localeCompare(b.created_at),
-        ),
-    [tasks, filter, dateFilter, project, priority, sort, today],
+              : a.created_at.localeCompare(b.created_at);
+          return sortDirection === "asc" ? result : -result;
+        }),
+    [tasks, filter, dateFilter, project, priority, sort, sortDirection, today],
   );
-  const tree = useMemo(() => buildTaskTree(shown), [shown]);
+  const totalPages = Math.max(1, Math.ceil(shown.length / TASKS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedTasks = useMemo(() => shown.slice((currentPage - 1) * TASKS_PER_PAGE, currentPage * TASKS_PER_PAGE), [shown, currentPage]);
+  const tree = useMemo(() => buildTaskTree(pagedTasks), [pagedTasks]);
   const actionableShown = useMemo(
     () =>
       shown.filter(
@@ -214,6 +225,7 @@ export function TaskManager({
                   setDateFilter("all");
                   setProject("");
                   setPriority("");
+                  setPage(1);
                 }}
                 className="text-xs font-semibold text-indigo-600"
               >
@@ -221,11 +233,11 @@ export function TaskManager({
               </button>
             )}
           </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
             <select
               aria-label="ステータスで絞り込み"
               value={filter}
-              onChange={(e) => setFilter(e.target.value as typeof filter)}
+              onChange={(e) => { setFilter(e.target.value as typeof filter); setPage(1); }}
               className={inputClass}
             >
               <option value="open">状態：未完了</option>
@@ -237,7 +249,7 @@ export function TaskManager({
             <select
               aria-label="期限で絞り込み"
               value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
+              onChange={(e) => { setDateFilter(e.target.value); setPage(1); }}
               className={inputClass}
             >
               <option value="all">期限：すべて</option>
@@ -247,7 +259,7 @@ export function TaskManager({
             </select>
             <select
               value={project}
-              onChange={(e) => setProject(e.target.value)}
+              onChange={(e) => { setProject(e.target.value); setPage(1); }}
               className={inputClass}
             >
               <option value="">全プロジェクト</option>
@@ -259,7 +271,7 @@ export function TaskManager({
             </select>
             <select
               value={priority}
-              onChange={(e) => setPriority(e.target.value)}
+              onChange={(e) => { setPriority(e.target.value); setPage(1); }}
               className={inputClass}
             >
               <option value="">全優先度</option>
@@ -270,12 +282,17 @@ export function TaskManager({
             <select
               aria-label="並び替え"
               value={sort}
-              onChange={(e) => setSort(e.target.value)}
+              onChange={(e) => { setSort(e.target.value); setPage(1); }}
               className={inputClass}
             >
               <option value="created">並び順：作成順</option>
+              <option value="title">並び順：タイトル順</option>
               <option value="due">並び順：期限順</option>
               <option value="priority">並び順：優先度順</option>
+            </select>
+            <select aria-label="昇順または降順" value={sortDirection} onChange={(e) => { setSortDirection(e.target.value as "asc" | "desc"); setPage(1); }} className={inputClass}>
+              <option value="asc">順序：昇順</option>
+              <option value="desc">順序：降順</option>
             </select>
           </div>
           <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3">
@@ -383,6 +400,7 @@ export function TaskManager({
                 onDelete={(node) => run(deleteTask(node.id))}
               />
             ))}
+            <Pagination page={currentPage} totalItems={shown.length} pageSize={TASKS_PER_PAGE} onPageChange={setPage} />
           </div>
         ) : (
           <div className="grid min-h-64 place-items-center p-8 text-center">
