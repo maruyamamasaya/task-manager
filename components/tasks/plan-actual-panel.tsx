@@ -18,17 +18,21 @@ export function PlanActualPanel({
   logs,
   actualMinutes,
   onActualMinutesChange,
+  correctedActual,
+  onCorrectedActualChange,
 }: {
   task: Task;
   schedules: TaskSchedule[];
   logs: WorkLog[];
   actualMinutes: number[];
   onActualMinutesChange: (minutes: number[]) => void;
+  correctedActual: number | null;
+  onCorrectedActualChange: (minutes: number | null) => void;
 }) {
   const [custom, setCustom] = useState(25);
   const existingActual = totalWorkMinutes(logs);
   const stagedActual = actualMinutes.reduce((sum, minutes) => sum + minutes, 0);
-  const actual = existingActual + stagedActual;
+  const actual = (correctedActual ?? existingActual) + stagedActual;
   const diff = variance(actual, task.estimated_minutes);
   const rate = actualRate(actual, task.estimated_minutes);
   const scheduled = schedules.reduce(
@@ -41,6 +45,7 @@ export function PlanActualPanel({
 
   const addActual = (minutes: number) => {
     if (Number.isInteger(minutes) && minutes > 0) {
+      onCorrectedActualChange(null);
       onActualMinutesChange([...actualMinutes, minutes]);
     }
   };
@@ -55,6 +60,16 @@ export function PlanActualPanel({
       <p className="mt-2 text-xs text-slate-500">
         予定比 {rate === null ? "—" : `${rate}%`} ・ スケジュール済み {scheduled}分 ・ 未配置 {Math.max(0, (task.estimated_minutes ?? 0) - scheduled)}分
       </p>
+
+      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <label className="text-sm font-semibold" htmlFor="correct-actual">現在の実績を修正</label>
+        <p className="mt-1 text-xs text-slate-500">追加ではなく、保存後の実績合計を直接指定します。</p>
+        <div className="mt-2 flex items-center gap-2">
+          <input id="correct-actual" aria-label="修正後の実績（分）" type="number" min="0" step="1" value={correctedActual ?? existingActual} onChange={(event) => { onActualMinutesChange([]); onCorrectedActualChange(Number(event.target.value)); }} className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
+          <span className="text-sm text-slate-500">分</span>
+          {correctedActual !== null && <button type="button" className="px-2 text-sm text-slate-500" onClick={() => onCorrectedActualChange(null)}>元に戻す</button>}
+        </div>
+      </div>
 
       <div className="mt-4">
         <p className="text-sm font-semibold">実績を追加</p>
