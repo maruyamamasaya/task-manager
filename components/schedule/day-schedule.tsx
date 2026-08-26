@@ -53,6 +53,7 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
   const taskMap = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
   const visibleTasks = useMemo(() => tasks.filter((task) => projectId === "all" || (projectId === "unclassified" ? !task.project_id : task.project_id === projectId)), [tasks, projectId]);
   const copySchedule = async () => { await navigator.clipboard.writeText(scheduleMarkdown(date,schedules,new Map(tasks.map(t=>[t.id,t.title])))); setMessage("Markdown形式のスケジュールをコピーしました"); };
+  const openTaskDetails = (selectedTaskId: string) => router.push(`/tasks?task=${selectedTaskId}`);
 
   const act = (promise: Promise<{ error?: string }>) => go(async () => {
     const result = await promise;
@@ -123,7 +124,7 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
         <div><span className="eyebrow">DAILY TIMELINE</span><h2>今日の時間割</h2></div>
         <div className="schedule-totals"><span>予定 <b>{totals.planned}分</b></span><span>実績 <b>{totals.actual}分</b></span><span>差分 <b>{varianceLabel(totals.difference)}</b></span><button onClick={copySchedule}>Markdownをコピー</button></div>
       </div>
-      <div className="timeline-legend"><span><i className="legend-dot" />15分単位・ドラッグ中に開始時刻を表示</span><span>ブロックをドラッグして移動</span></div>
+      <div className="timeline-legend"><span><i className="legend-dot" />15分単位・ドラッグ中に開始時刻を表示</span><span>Shift＋クリック／右クリックで詳細 · ドラッグで移動</span></div>
       <div className="timeline-scroll-area">
         <div
           className={`day-timeline ${dragOver ? "is-drag-over" : ""}`}
@@ -147,7 +148,9 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
               draggable
               onDragStart={(event) => { event.dataTransfer.setData("task-id", schedule.task_id); event.dataTransfer.setData("schedule-id", schedule.id); event.dataTransfer.effectAllowed = "move"; setDragging({ taskId: schedule.task_id, scheduleId: schedule.id, duration, title: task?.title ?? "削除されたタスク" }); }}
               onDragEnd={finishDragging}
-              onClick={() => setTaskId(schedule.task_id)}
+              onClick={(event) => event.shiftKey ? openTaskDetails(schedule.task_id) : setTaskId(schedule.task_id)}
+              onContextMenu={(event) => { event.preventDefault(); openTaskDetails(schedule.task_id); }}
+              title="Shift＋クリックまたは右クリックでタスク詳細を開く"
               className={`timeline-task timeline-task--${COLORS[index % COLORS.length]} ${conflict ? "has-conflict" : ""}`}
               style={{ top, height }}
             >

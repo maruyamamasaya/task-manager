@@ -20,6 +20,10 @@ body {
 }
 button, input { font: inherit; }
 button { cursor: pointer; }
+.task-sort-row.is-drop-before::before,.task-sort-row.is-drop-after::after { position:absolute; right:12px; left:12px; z-index:10; height:3px; border-radius:999px; background:#4f46e5; box-shadow:0 0 0 1px #fff,0 2px 7px #4f46e566; content:""; pointer-events:none; }
+.task-sort-row.is-drop-before::before { top:-2px; }.task-sort-row.is-drop-after::after { bottom:-2px; }
+.task-sort-row.is-drop-before>div::before,.task-sort-row.is-drop-after>div::after { position:absolute; left:6px; z-index:11; width:9px; height:9px; border-radius:50%; background:#4f46e5; content:""; pointer-events:none; }
+.task-sort-row.is-drop-before>div::before { top:-5px; }.task-sort-row.is-drop-after>div::after { bottom:-5px; }
 :focus-visible { outline: 3px solid #b9b9fa; outline-offset: 2px; }
 ::selection { background: #c7d2fe; color: #312e81; }
 
