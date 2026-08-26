@@ -40,6 +40,12 @@ npx supabase link --project-ref <project-ref>
 npx supabase db push
 ```
 
+DB のテーブル、カラム、制約、index、trigger、RLS、RPC を変更する開発では、既存 migration を書き換えず、必ず `supabase/migrations/` に新しい SQL を追加します。これにより既存の Supabase 環境にも `npx supabase db push` で同じ変更を適用できます。
+
+## 親タスク（フォルダ）の扱い
+
+子タスクが1件でも追加された親は、自動的に整理用の**フォルダ**になります。フォルダでは完了、進捗、優先度、期限、予定工数、タイマー、実績、スケジュール、振り返りを操作できません。子タスクを追加した時点で親のタスク状態・進捗・期限・予定工数はクリアされます。既存の実績やスケジュールは履歴保全のため削除しませんが、新規追加はDB triggerでも拒否します。このルールは `20260826000000_parent_tasks_become_folders.sql` で既存環境にも適用されます。
+
 既存環境にも `npx supabase db push` で Phase 2 migration を適用してください。初期 migration は7テーブル、外部キー、検査制約、インデックス、更新日時トリガー、および全テーブルの RLS を作成します。RLS は認証ユーザーの `auth.uid()` と `user_id`（profile は `id`）を照合し、関連する project/task も同一ユーザー所有か検証します。Phase 2 migration は3階層制約と、RLSを維持した原子的な完了連動RPCを追加します。
 
 ローカル起動:
