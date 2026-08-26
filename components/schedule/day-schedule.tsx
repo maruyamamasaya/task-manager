@@ -139,7 +139,7 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
             const task = taskMap.get(schedule.task_id);
             const startValue = timeValue(new Date(schedule.start_at));
             const top = minutesFromStart(startValue) / 60 * HOUR_HEIGHT;
-            const duration = task?.estimated_minutes || scheduleMinutes(schedule);
+            const duration = scheduleMinutes(schedule);
             const endValue = valueFromMinutes(minutesFromStart(startValue) + duration);
             const height = Math.max(32, duration / 60 * HOUR_HEIGHT);
             const conflict = schedules.some((other) => other.id !== schedule.id && overlaps(schedule, other));

@@ -26,6 +26,22 @@ function todayInTokyo() {
   }).format(new Date());
 }
 
+function scheduleFields(schedule: Pick<TaskSchedule, "start_at" | "end_at">) {
+  const parts = (value: string) => Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(new Date(value)).map((part) => [part.type, part.value]),
+  );
+  const start = parts(schedule.start_at);
+  const end = parts(schedule.end_at);
+  return {
+    date: `${start.year}-${start.month}-${start.day}`,
+    start: `${start.hour}:${start.minute}`,
+    end: `${end.hour}:${end.minute}`,
+  };
+}
+
 export function PlanActualPanel({
   task,
   schedules,
@@ -45,10 +61,11 @@ export function PlanActualPanel({
   newSchedules: NewSchedule[];
   onSchedulesChange: (schedules: NewSchedule[]) => void;
 }) {
+  const initialSchedule = schedules[0] ? scheduleFields(schedules[0]) : null;
   const [custom, setCustom] = useState(25);
-  const [date, setDate] = useState(todayInTokyo);
-  const [start, setStart] = useState("09:00");
-  const [end, setEnd] = useState("10:00");
+  const [date, setDate] = useState(initialSchedule?.date ?? todayInTokyo);
+  const [start, setStart] = useState(initialSchedule?.start ?? "09:00");
+  const [end, setEnd] = useState(initialSchedule?.end ?? "10:00");
   const existingActual = totalWorkMinutes(logs);
   const stagedActual = actualMinutes.reduce((sum, minutes) => sum + minutes, 0);
   const actual = existingActual + stagedActual;
@@ -73,6 +90,9 @@ export function PlanActualPanel({
   const invalidSchedule = candidate
     ? new Date(candidate.startAt) >= new Date(candidate.endAt)
     : false;
+  const candidateMatchesSaved = candidate
+    ? schedules.some((schedule) => schedule.start_at === candidate.startAt && schedule.end_at === candidate.endAt)
+    : false;
   const candidateConflict = candidate
     ? [...allSchedules, ...newSchedules.map((item, index) => ({
         id: `new-${index}`,
@@ -81,7 +101,11 @@ export function PlanActualPanel({
         start_at: item.startAt,
         end_at: item.endAt,
         created_at: item.startAt,
-      }))].some((schedule) => overlaps(
+      }))].some((schedule) => !(
+        schedule.task_id === task.id &&
+        schedule.start_at === candidate.startAt &&
+        schedule.end_at === candidate.endAt
+      ) && overlaps(
         { start_at: candidate.startAt, end_at: candidate.endAt },
         schedule,
       ))
@@ -114,7 +138,7 @@ export function PlanActualPanel({
 
       <div className="mt-5">
         <p className="text-sm font-semibold">スケジュール予定</p>
-        <p className="mt-1 text-xs text-slate-500">日時を指定して、保存待ちの予定に追加できます。</p>
+        <p className="mt-1 text-xs text-slate-500">設定済みの予定がある場合は、その日時を入力欄に反映します。別の日時を指定して予定を追加することもできます。</p>
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
           <input aria-label="予定日" type="date" value={date} onChange={(event) => setDate(event.target.value)} className="rounded-lg border px-3 py-2 text-sm" />
           <input aria-label="開始時刻" type="time" value={start} onChange={(event) => setStart(event.target.value)} className="rounded-lg border px-3 py-2 text-sm" />
@@ -124,16 +148,17 @@ export function PlanActualPanel({
         {!invalidSchedule && candidateConflict && <p role="alert" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">⚠ この時間帯は別のスケジュールと重複しています。</p>}
         <button
           type="button"
-          disabled={!candidate || invalidSchedule}
+          disabled={!candidate || invalidSchedule || candidateMatchesSaved}
           onClick={() => candidate && onSchedulesChange([...newSchedules, candidate])}
           className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 disabled:opacity-50"
         >
-          ＋ 保存待ちの予定に追加
+          {candidateMatchesSaved ? "設定済みの予定です" : "＋ 保存待ちの予定に追加"}
         </button>
         {[...schedules.map((schedule) => ({ startAt: schedule.start_at, endAt: schedule.end_at, saved: true })), ...newSchedules.map((schedule) => ({ ...schedule, saved: false }))].map((schedule, index, items) => {
           const conflict = items.some((other, otherIndex) => otherIndex !== index && overlaps({ start_at: schedule.startAt, end_at: schedule.endAt }, { start_at: other.startAt, end_at: other.endAt })) || allSchedules.some((other) => other.task_id !== task.id && overlaps({ start_at: schedule.startAt, end_at: schedule.endAt }, other));
           return <div className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${conflict ? "bg-amber-50 text-amber-800" : "bg-slate-50"}`} key={`${schedule.startAt}-${index}`}>
             <span className="flex-1">{formatTokyo(schedule.startAt, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}〜{formatTokyo(schedule.endAt, { hour: "2-digit", minute: "2-digit" })}（{scheduleMinutes({ start_at: schedule.startAt, end_at: schedule.endAt })}分）{conflict ? " · 重複あり" : ""}{!schedule.saved ? " · 保存待ち" : ""}</span>
+            {schedule.saved && <button type="button" className="shrink-0 text-indigo-700" onClick={() => { const fields = scheduleFields({ start_at: schedule.startAt, end_at: schedule.endAt }); setDate(fields.date); setStart(fields.start); setEnd(fields.end); }}>日時を反映</button>}
             {!schedule.saved && <button type="button" className="text-red-600" onClick={() => onSchedulesChange(newSchedules.filter((_, newIndex) => newIndex !== index - schedules.length))}>削除</button>}
           </div>;
         })}

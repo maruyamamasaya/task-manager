@@ -17,7 +17,6 @@ import type {
   TaskSchedule,
   TaskStatus,
   WorkLog,
-  ProgressLog,
   Reflection,
 } from "@/types/database";
 import { PlanActualPanel } from "./plan-actual-panel";
@@ -49,7 +48,6 @@ export function TaskManager({
   projects,
   schedules,
   workLogs,
-  progressLogs,
   reflections,
   initialTaskId,
 }: {
@@ -57,7 +55,6 @@ export function TaskManager({
   projects: Project[];
   schedules: TaskSchedule[];
   workLogs: WorkLog[];
-  progressLogs: ProgressLog[];
   reflections: Reflection[];
   initialTaskId?: string;
 }) {
@@ -475,7 +472,6 @@ export function TaskManager({
               ),
             )
           }
-          history={progressLogs.filter((l) => l.task_id === selected.id)}
           reflection={
             reflections.find((r) => r.task_id === selected.id) ?? null
           }
@@ -712,7 +708,6 @@ function TaskDrawer({
   schedules,
   allSchedules,
   logs,
-  history,
   reflection,
   onClose,
   onSave,
@@ -723,7 +718,6 @@ function TaskDrawer({
   schedules: TaskSchedule[];
   allSchedules: TaskSchedule[];
   logs: WorkLog[];
-  history: ProgressLog[];
   reflection: Reflection | null;
   onClose: () => void;
   onSave: (
@@ -906,7 +900,6 @@ function TaskDrawer({
             />
             <ProgressReflectionPanel
               task={task}
-              history={history}
               reflection={reflection}
             />
             <button
