@@ -115,7 +115,7 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
           <span className="palette-task-body"><strong>{task.title}</strong><small>{dueLabel(task.due_at)}</small></span>
           <span className="task-estimate">{task.estimated_minutes ? `${task.estimated_minutes}分` : "未設定"}</span>
         </button>)}
-        {!visibleTasks.length && <p className="schedule-empty">該当する未完了タスクがありません</p>}
+        {!visibleTasks.length && <p className="schedule-empty">該当するタスクがありません</p>}
       </div>
     </aside>
 
