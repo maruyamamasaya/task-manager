@@ -105,6 +105,19 @@ export async function toggleTask(id: string, done: boolean) {
   refresh();
   return { ok: true };
 }
+export async function updateTaskOrder(ids: string[]) {
+  const { db, user } = await context();
+  for (const [sortOrder, id] of ids.entries()) {
+    const { error } = await db
+      .from("tasks")
+      .update({ sort_order: sortOrder })
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) return { error: error.message };
+  }
+  refresh();
+  return { ok: true };
+}
 export async function saveProgress(id: string, progress: number, note: string) {
   const { db } = await context();
   const { error } = await db.rpc("update_task_progress", {
