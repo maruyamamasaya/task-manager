@@ -24,6 +24,7 @@ import { PlanActualPanel } from "./plan-actual-panel";
 import { totalWorkMinutes } from "@/lib/time/phase3";
 import { ProgressReflectionPanel } from "./progress-reflection-panel";
 import { averageProgress } from "@/lib/tasks/phase4";
+import { DatabaseUpdating } from "@/components/ui/database-updating";
 
 const statusLabel = { todo: "未着手", doing: "進行中", done: "完了" };
 const priorityLabel = { low: "低", medium: "中", high: "高" };
@@ -157,6 +158,7 @@ export function TaskManager({
   };
   return (
     <div className="space-y-4">
+      <DatabaseUpdating active={pending} />
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <form onSubmit={(e) => e.preventDefault()}>
           <label

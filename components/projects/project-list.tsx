@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { archiveProject, createProject, deleteProject, renameProject, setProjectColor } from "@/app/(app)/projects/actions";
 import { projectProgress } from "@/lib/tasks/phase4";
 import type { Project, Task } from "@/types/database";
+import { DatabaseUpdating } from "@/components/ui/database-updating";
 
 const colors = ["#6366f1", "#0ea5e9", "#14b8a6", "#22c55e", "#eab308", "#f97316", "#f43f5e", "#a855f7"];
 
@@ -14,6 +15,7 @@ export function ProjectList({ projects, tasks }: { projects: Project[]; tasks: P
   const run = (promise: Promise<{ error?: string }>) => start(async () => { const result = await promise; if (result.error) alert(result.error); else location.reload(); });
 
   return <div className="space-y-4">
+    <DatabaseUpdating active={pending} />
     <form onSubmit={event => { event.preventDefault(); if (name.trim()) run(createProject(name, color)); }} className="rounded-2xl border bg-white p-4">
       <div className="flex gap-2"><input value={name} onChange={event => setName(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2" placeholder="新しいプロジェクト名"/><button disabled={pending} className="rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white">作成</button></div>
       <ColorPicker value={color} onChange={setColor} label="プロジェクトの色" />
