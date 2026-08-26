@@ -6,6 +6,7 @@ import { deleteSchedule, saveSchedule } from "@/app/(app)/phase3-actions";
 import { dailyTotals, formatTokyo, overlaps, scheduleMarkdown, scheduleMinutes, tokyoDateTime, varianceLabel } from "@/lib/time/phase3";
 import { holidayName } from "@/lib/time/japanese-holidays";
 import type { DayOff, Project, Task, TaskSchedule, WorkLog } from "@/types/database";
+import { DatabaseUpdating } from "@/components/ui/database-updating";
 
 const START_HOUR = 9;
 const END_HOUR = 20;
@@ -47,7 +48,7 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
   const [dragOver, setDragOver] = useState(false);
   const [dragging, setDragging] = useState<DraggingTask>();
   const [dropPreview, setDropPreview] = useState<DropPreview>();
-  const [, go] = useTransition();
+  const [pending, go] = useTransition();
   const totals = dailyTotals(schedules, logs);
   const taskMap = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
   const visibleTasks = useMemo(() => tasks.filter((task) => projectId === "all" || (projectId === "unclassified" ? !task.project_id : task.project_id === projectId)), [tasks, projectId]);
@@ -92,7 +93,7 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
   };
 
   const leaveLabel=dayOff?({holiday:"休日",paid_leave:"有休",am_leave:"午前休",pm_leave:"午後休"} as const)[dayOff.status]:holidayName(date);
-  return <>{leaveLabel&&<div className="day-leave-banner"><span>休</span><div><b>{leaveLabel}</b>{dayOff?.note&&<small>{dayOff.note}</small>}</div><a href="/holidays">休日設定を開く</a></div>}<div className="schedule-workspace">
+  return <><DatabaseUpdating active={pending} />{leaveLabel&&<div className="day-leave-banner"><span>休</span><div><b>{leaveLabel}</b>{dayOff?.note&&<small>{dayOff.note}</small>}</div><a href="/holidays">休日設定を開く</a></div>}<div className="schedule-workspace">
     <aside className="task-palette">
       <div className="schedule-section-heading">
         <div><span className="eyebrow">UNSCHEDULED TASKS</span><h2>タスクを選ぶ</h2></div>
