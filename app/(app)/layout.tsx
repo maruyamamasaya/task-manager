@@ -6,5 +6,5 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  return <div className="min-h-screen md:flex"><Sidebar email={user.email ?? "ユーザー"} /><main className="min-w-0 flex-1 px-5 py-7 pb-28 sm:px-8 lg:px-12 lg:py-10 xl:px-16"><div className="mx-auto max-w-[1440px]">{children}</div></main></div>;
+  return <div className="min-h-screen md:flex"><Sidebar email={user.email ?? "ユーザー"} /><main className="min-w-0 flex-1 px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:py-8 xl:px-10"><div className="mx-auto max-w-[1600px]">{children}</div></main></div>;
 }

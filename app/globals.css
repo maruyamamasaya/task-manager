@@ -2,29 +2,44 @@
 
 :root {
   color-scheme: light;
-  --brand: #6366f1;
-  --brand-deep: #4f46e5;
-  --ink: #172033;
+  --background: #f8f9fb;
+  --surface: #ffffff;
+  --surface-subtle: #f6f7f9;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-tertiary: #9ca3af;
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-soft: #eef2ff;
+  --success: #059669;
+  --success-soft: #ecfdf5;
+  --warning: #d97706;
+  --warning-soft: #fffbeb;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --brand: var(--primary);
+  --brand-deep: var(--primary-hover);
+  --ink: var(--text-primary);
 }
 * { box-sizing: border-box; }
-html { background: #f4f6fb; }
+html { background: var(--background); }
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at 80% -10%, rgb(199 210 254 / .34), transparent 34rem),
-    radial-gradient(circle at 10% 90%, rgb(186 230 253 / .24), transparent 30rem),
-    #f4f6fb;
+  background: var(--background);
   color: var(--ink);
   font-family: Inter, "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-button, input { font: inherit; }
+button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
 .task-sort-row.is-drop-before::before,.task-sort-row.is-drop-after::after { position:absolute; right:12px; left:12px; z-index:10; height:3px; border-radius:999px; background:#4f46e5; box-shadow:0 0 0 1px #fff,0 2px 7px #4f46e566; content:""; pointer-events:none; }
 .task-sort-row.is-drop-before::before { top:-2px; }.task-sort-row.is-drop-after::after { bottom:-2px; }
 .task-sort-row.is-drop-before>div::before,.task-sort-row.is-drop-after>div::after { position:absolute; left:6px; z-index:11; width:9px; height:9px; border-radius:50%; background:#4f46e5; content:""; pointer-events:none; }
 .task-sort-row.is-drop-before>div::before { top:-5px; }.task-sort-row.is-drop-after>div::after { bottom:-5px; }
-:focus-visible { outline: 3px solid #b9b9fa; outline-offset: 2px; }
+:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
 ::selection { background: #c7d2fe; color: #312e81; }
 
 /* Schedule plotter */
@@ -109,3 +124,22 @@ button { cursor: pointer; }
 /* Holiday settings */
 .holiday-settings { display:grid; grid-template-columns:minmax(260px,360px) minmax(0,1fr); gap:24px; }.holiday-form,.holiday-list { border:1px solid #dfe5ee; border-radius:18px; background:#fff; box-shadow:0 10px 35px #3341550b; }.holiday-form { display:flex; height:max-content; flex-direction:column; gap:16px; padding:24px; }.holiday-form label { color:#64748b; font-size:11px; font-weight:750; }.holiday-form input,.holiday-form select { width:100%; margin-top:6px; padding:10px 11px; border:1px solid #d8e0ea; border-radius:9px; background:#fff; color:#334155; }.holiday-form>button { padding:11px; border:0; border-radius:9px; background:#4f46e5; color:#fff; font-size:12px; font-weight:800; }.holiday-edit-cancel { color:#64748b; font-size:11px; font-weight:750; text-align:center; }.holiday-list { overflow:hidden; }.holiday-list-head { display:flex; justify-content:space-between; padding:18px 20px; border-bottom:1px solid #edf0f4; }.holiday-list-head span { color:#94a3b8; font-size:11px; }.holiday-list article { display:grid; grid-template-columns:100px 70px 1fr auto; align-items:center; gap:12px; padding:15px 20px; border-bottom:1px solid #f0f2f5; }.holiday-list time { color:#475569; font-size:12px; font-weight:750; }.holiday-list article p { margin:0; color:#7c8798; font-size:11px; }.holiday-item-actions { display:flex; align-items:center; gap:10px; }.holiday-item-actions a { color:#4f46e5; font-size:10px; font-weight:750; }.holiday-list article button { border:0; background:none; color:#e06a76; font-size:10px; }.leave-badge { padding:5px 8px; border-radius:20px; background:#fff0f1; color:#bf4b59; font-size:10px; font-weight:800; text-align:center; }.leave-badge--am_leave,.leave-badge--pm_leave { background:#fff8e5; color:#a86f16; }.holiday-empty { padding:50px 20px; color:#94a3b8; text-align:center; font-size:12px; }.day-leave-banner { display:flex; align-items:center; gap:12px; margin-bottom:12px; padding:12px 16px; border:1px solid #fecdd3; border-radius:14px; background:#fff1f2; color:#9f3444; }.day-leave-banner>span { display:grid; width:32px; height:32px; place-items:center; border-radius:9px; background:#e96878; color:#fff; font-size:12px; font-weight:800; }.day-leave-banner div { display:flex; flex:1; flex-direction:column; }.day-leave-banner small { margin-top:2px; color:#b86670; }.day-leave-banner a { color:#a44250; font-size:10px; font-weight:750; text-decoration:underline; }
 @media(max-width:700px){.holiday-settings{grid-template-columns:1fr}.holiday-list article{grid-template-columns:1fr auto}.holiday-list article p{grid-column:1/-1}.day-leave-banner a{display:none}}
+
+/* Modern productivity surfaces */
+.schedule-calendar,.schedule-workspace,.holiday-form,.holiday-list { border-color:rgb(226 232 240 / .8); border-radius:12px; box-shadow:none; }
+.schedule-workspace { grid-template-columns:280px minmax(0,1fr); }
+.task-palette { padding:20px 16px; background:#fff; }
+.timeline-panel { padding:20px; }
+.schedule-date-nav { border-radius:10px; box-shadow:none; }
+.schedule-view-tabs a.active { background:#eef2ff; color:#4338ca; box-shadow:none; }
+.schedule-section-heading h2,.timeline-heading h2 { font-size:15px; font-weight:600; }
+.eyebrow { color:#94a3b8; font-weight:600; letter-spacing:.08em; }
+.palette-task { margin-bottom:6px; border-radius:8px; box-shadow:none; }
+.palette-task:hover { transform:none; box-shadow:none; background:#f8fafc; }
+.timeline-task { box-shadow:none; }
+.timeline-task:hover { box-shadow:0 1px 2px #0f172a14; }
+.holiday-form,.holiday-list { box-shadow:none; }
+.leave-badge { border-radius:6px; }
+.holiday-form input,.holiday-form select,.project-task-filter select,.time-inputs input { outline:none; }
+.holiday-form input:focus,.holiday-form select:focus,.project-task-filter select:focus,.time-inputs input:focus { border-color:#818cf8; box-shadow:0 0 0 3px #e0e7ff; }
+@media(max-width:600px){.schedule-date-controls{flex-wrap:wrap;gap:8px;justify-content:center}.schedule-today-button{order:2}.schedule-date-nav{width:100%}.schedule-date-nav b{min-width:0;flex:1}.holiday-form{padding:18px}.holiday-list article{padding:14px 16px}}
