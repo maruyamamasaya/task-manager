@@ -35,6 +35,19 @@ export async function createTask(input: TaskInput) {
   const title = input.title.trim();
   if (!title) return { error: "タイトルを入力してください。" };
   const { db, user } = await context();
+  if (input.parent_id) {
+    const { count, error: scheduleError } = await db
+      .from("task_schedules")
+      .select("id", { count: "exact", head: true })
+      .eq("task_id", input.parent_id);
+    if (scheduleError) return { error: scheduleError.message };
+    if (count) {
+      return {
+        error:
+          "スケジュールに配置済みのタスクには子タスクを追加できません。先に予定を削除してください。",
+      };
+    }
+  }
   const state = normalizeState(input.status ?? "todo", input.progress ?? 0);
   const { error } = await db
     .from("tasks")
