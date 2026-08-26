@@ -1,6 +1,6 @@
 "use client";
 
-import { CSSProperties, DragEvent, useMemo, useState, useTransition } from "react";
+import { CSSProperties, DragEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteSchedule, saveSchedule } from "@/app/(app)/phase3-actions";
 import { dailyTotals, formatTokyo, overlaps, scheduleMarkdown, scheduleMinutes, tokyoDateTime, varianceLabel } from "@/lib/time/phase3";
@@ -13,6 +13,7 @@ const END_HOUR = 20;
 const HOUR_HEIGHT = 76;
 const MINUTES_PER_STEP = 15;
 const UNCLASSIFIED_COLOR = "#94a3b8";
+const statusLabel = { todo: "未着手", doing: "進行中", done: "完了済み" } as const;
 
 type DraggingTask = { taskId: string; scheduleId?: string; duration: number; title: string };
 type DropPreview = DraggingTask & { offset: number };
@@ -48,6 +49,7 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
   const [dragOver, setDragOver] = useState(false);
   const [dragging, setDragging] = useState<DraggingTask>();
   const [dropPreview, setDropPreview] = useState<DropPreview>();
+  const [now, setNow] = useState(() => new Date());
   const [pending, go] = useTransition();
   const totals = dailyTotals(schedules, logs);
   const taskMap = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
@@ -56,6 +58,14 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
   const visibleTasks = useMemo(() => tasks.filter((task) => projectId === "all" || (projectId === "unclassified" ? !task.project_id : task.project_id === projectId)), [tasks, projectId]);
   const copySchedule = async () => { await navigator.clipboard.writeText(scheduleMarkdown(date,schedules,new Map(tasks.map(t=>[t.id,t.title])))); setMessage("Markdown形式のスケジュールをコピーしました"); };
   const openTaskDetails = (selectedTaskId: string) => router.push(`/tasks?task=${selectedTaskId}`);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const isToday = date === new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  const nowValue = timeValue(now);
+  const nowOffset = minutesFromStart(nowValue);
+  const showNow = isToday && nowOffset >= 0 && nowOffset <= (END_HOUR - START_HOUR) * 60;
 
   const act = (promise: Promise<{ error?: string }>) => go(async () => {
     const result = await promise;
@@ -158,11 +168,13 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
               style={{ top, height, "--task": taskColor(task), "--task-bg": `color-mix(in srgb, ${taskColor(task)} 10%, white)` } as CSSProperties}
             >
               <span className="timeline-task-time">{startValue}–{endValue}</span>
+              <span className={`timeline-task-status is-${task?.status ?? "todo"}`}>{statusLabel[task?.status ?? "todo"]} · {task?.progress ?? 0}%</span>
               <strong>{task?.title ?? "削除されたタスク"}</strong>
               <small>{dueLabel(task?.due_at ?? null)}{conflict ? " · 予定が重複しています" : ""}</small>
               <span className="timeline-delete" role="button" aria-label="予定を削除" onClick={(event) => { event.stopPropagation(); act(deleteSchedule(schedule.id)); }}>×</span>
             </button>;
           })}
+          {showNow && <div className="timeline-now" style={{ top: nowOffset / 60 * HOUR_HEIGHT }} aria-label={`現在時刻 ${nowValue}`}><time>{nowValue}</time><span /></div>}
           {dropPreview && <div
             className="timeline-drop-preview"
             style={{ top: dropPreview.offset / 60 * HOUR_HEIGHT, height: Math.max(32, Math.min(dropPreview.duration, (END_HOUR - START_HOUR) * 60 - dropPreview.offset) / 60 * HOUR_HEIGHT) }}

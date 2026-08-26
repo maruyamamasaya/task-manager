@@ -899,6 +899,10 @@ function TaskDrawer({
                     ))}
                   </span>
                 </Field>
+                <div className="sm:col-span-2">
+                  <ProgressReflectionPanel task={task} reflection={reflection} section="progress" />
+                </div>
+                <div className="sm:col-span-2">
                 <Field label="期限">
                   <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
                     <input type="date" value={form.due_at} onChange={(e) => set("due_at", e.target.value)} className={`${inputClass} font-semibold text-slate-700`} />
@@ -909,33 +913,20 @@ function TaskDrawer({
                     <p className="mt-2 text-xs text-slate-500">日付欄のカレンダーアイコンから月表示で選択できます。</p>
                   </div>
                 </Field>
+                </div>
               </>
             )}
           </div>
-          <button className="w-full rounded-lg bg-indigo-600 py-2.5 font-semibold text-white">
-            保存
-          </button>
+          {!isFolder && <PlanActualPanel task={task} schedules={schedules} logs={logs} actualMinutes={actualMinutes} onActualMinutesChange={setActualMinutes} />}
+          <button className="w-full rounded-lg bg-indigo-600 py-2.5 font-semibold text-white">保存</button>
         </form>
         {!isFolder && (
           <>
-            <PlanActualPanel
-              task={task}
-              schedules={schedules}
-              logs={logs}
-              actualMinutes={actualMinutes}
-              onActualMinutesChange={setActualMinutes}
-            />
             <ProgressReflectionPanel
               task={task}
               reflection={reflection}
+              section="reflection"
             />
-            <button
-              type="submit"
-              form="task-detail-form"
-              className="mt-6 w-full rounded-lg bg-indigo-600 py-2.5 font-semibold text-white"
-            >
-              変更内容をすべて保存
-            </button>
           </>
         )}
       </section>
