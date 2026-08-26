@@ -27,7 +27,7 @@ import { PlanActualPanel } from "./plan-actual-panel";
 import { totalWorkMinutes } from "@/lib/time/phase3";
 import { ProgressReflectionPanel } from "./progress-reflection-panel";
 import { DatabaseUpdating } from "@/components/ui/database-updating";
-import { addWorkLog } from "@/app/(app)/phase3-actions";
+import { addWorkLog, correctActualMinutes } from "@/app/(app)/phase3-actions";
 import { Pagination } from "@/components/ui/pagination";
 
 const TASKS_PER_PAGE = 40;
@@ -495,10 +495,11 @@ export function TaskManager({
           schedules={schedules.filter((s) => s.task_id === selected.id)}
           logs={workLogs.filter((l) => l.task_id === selected.id)}
           onClose={() => setSelected(null)}
-          onSave={(input, actualMinutes) =>
+          onSave={(input, actualMinutes, correctedActual) =>
             run(
               Promise.all([
                 updateTask(selected.id, input),
+                ...(correctedActual === null ? [] : [correctActualMinutes(selected.id, correctedActual)]),
                 ...actualMinutes.map((minutes) => addWorkLog(selected.id, minutes)),
               ]).then((results) =>
                 results.find((result) => result.error) ?? { ok: true },
@@ -765,13 +766,15 @@ function TaskDrawer({
   onSave: (
     i: TaskInput,
     actualMinutes: number[],
+    correctedActual: number | null,
   ) => void;
 }) {
   const [form, setForm] = useState({ ...task, due_at: localDate(task.due_at) });
   const [actualMinutes, setActualMinutes] = useState<number[]>([]);
+  const [correctedActual, setCorrectedActual] = useState<number | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
   const initialForm = useMemo(() => ({ ...task, due_at: localDate(task.due_at) }), [task]);
-  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm) || actualMinutes.length > 0;
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm) || actualMinutes.length > 0 || correctedActual !== null;
   const requestClose = () => isDirty ? setConfirmClose(true) : onClose();
   useEffect(() => {
     const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
@@ -820,6 +823,7 @@ function TaskDrawer({
                   : null,
               },
               actualMinutes,
+              correctedActual,
             );
             onClose();
           }}
@@ -927,7 +931,7 @@ function TaskDrawer({
               </>
             )}
           </div>
-          {!isFolder && <PlanActualPanel task={task} schedules={schedules} logs={logs} actualMinutes={actualMinutes} onActualMinutesChange={setActualMinutes} />}
+          {!isFolder && <PlanActualPanel task={task} schedules={schedules} logs={logs} actualMinutes={actualMinutes} onActualMinutesChange={setActualMinutes} correctedActual={correctedActual} onCorrectedActualChange={setCorrectedActual} />}
           <button className="w-full rounded-lg bg-indigo-600 py-2.5 font-semibold text-white">保存</button>
         </form>
         {!isFolder && (

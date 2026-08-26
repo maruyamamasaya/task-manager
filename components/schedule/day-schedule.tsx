@@ -142,7 +142,7 @@ export function DaySchedule({ date, tasks, projects, schedules, meetings, logs, 
       <div className="meeting-creator">
         <div className="schedule-section-heading"><div><span className="eyebrow">MEETING</span><h2>会議の新規作成</h2></div></div>
         <label>会議名<input value={meetingName} onChange={(event)=>setMeetingName(event.target.value)} placeholder="例：週次ミーティング" disabled={isPast}/></label>
-        <div className="meeting-fields"><label>開始時間<input type="time" step="900" value={meetingStart} onChange={(event)=>setMeetingStart(event.target.value)} disabled={isPast}/></label><label>時間<select value={meetingDuration} onChange={(event)=>setMeetingDuration(Number(event.target.value))} disabled={isPast}>{[30,60,90,120].map(value=><option key={value} value={value}>{value}分</option>)}</select></label></div>
+        <div className="meeting-fields"><label>開始時間<input type="time" step="900" value={meetingStart} onChange={(event)=>setMeetingStart(event.target.value)} disabled={isPast}/></label><label>時間（分）<input type="number" min="1" step="1" list="meeting-duration-options" value={meetingDuration} onChange={(event)=>setMeetingDuration(Number(event.target.value))} disabled={isPast}/><datalist id="meeting-duration-options">{[30,45,60,90,120,150,180].map(value=><option key={value} value={value}/>)}</datalist></label></div>
         <button type="button" onClick={addMeeting} disabled={pending||isPast||!meetingName.trim()}>会議ブロックを作成</button>
         {isPast&&<small>過去のスケジュールは固定されています。</small>}
       </div>
