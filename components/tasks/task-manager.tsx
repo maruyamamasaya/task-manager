@@ -1,53 +1,857 @@
 "use client";
 import { useMemo, useRef, useState, useTransition } from "react";
-import { createTask, createTasks, deleteTask, importTasks, toggleTask, updateTask, type TaskInput } from "@/app/(app)/tasks/actions";
+import {
+  createTask,
+  createTasks,
+  deleteTask,
+  importTasks,
+  toggleTask,
+  updateTask,
+  type TaskInput,
+} from "@/app/(app)/tasks/actions";
 import { buildTaskTree, taskCheckState, type TaskNode } from "@/lib/tasks/tree";
 import { parseMarkdown, toMarkdown } from "@/lib/tasks/markdown";
-import type { Project, Task, TaskSchedule, TaskStatus, WorkLog, ProgressLog, Reflection } from "@/types/database";
+import type {
+  Project,
+  Task,
+  TaskSchedule,
+  TaskStatus,
+  WorkLog,
+  ProgressLog,
+  Reflection,
+} from "@/types/database";
 import { PlanActualPanel } from "./plan-actual-panel";
 import { totalWorkMinutes } from "@/lib/time/phase3";
 import { ProgressReflectionPanel } from "./progress-reflection-panel";
 import { averageProgress } from "@/lib/tasks/phase4";
 
-const statusLabel = { todo: "未着手", doing: "進行中", done: "完了" }; const priorityLabel = { low: "低", medium: "中", high: "高" };
-const inputClass = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-indigo-500 outline-none";
-function localDate(value: string | null) { if (!value) return ""; const d = new Date(value); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+const statusLabel = { todo: "未着手", doing: "進行中", done: "完了" };
+const priorityLabel = { low: "低", medium: "中", high: "高" };
+const inputClass =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-indigo-500 outline-none";
+function localDate(value: string | null) {
+  if (!value) return "";
+  const d = new Date(value);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
-export function TaskManager({ initialTasks, projects, schedules, workLogs, progressLogs, reflections, initialTaskId }: { initialTasks: Task[]; projects: Project[]; schedules: TaskSchedule[]; workLogs: WorkLog[]; progressLogs: ProgressLog[]; reflections: Reflection[]; initialTaskId?: string }) {
-  const [tasks, setTasks] = useState(initialTasks); const [filter, setFilter] = useState<"open"|"all"|TaskStatus>("open"); const [dateFilter, setDateFilter] = useState("all"); const [project, setProject] = useState(""); const [priority, setPriority] = useState(""); const [sort, setSort] = useState("created");
-  const [selected, setSelected] = useState<Task | null>(initialTasks.find(t=>t.id===initialTaskId)??null); const [quick, setQuick] = useState(""); const [notice, setNotice] = useState(""); const [importOpen, setImportOpen] = useState(false); const [markdown, setMarkdown] = useState(""); const [pending, startTransition] = useTransition();
+export function TaskManager({
+  initialTasks,
+  projects,
+  schedules,
+  workLogs,
+  progressLogs,
+  reflections,
+  initialTaskId,
+}: {
+  initialTasks: Task[];
+  projects: Project[];
+  schedules: TaskSchedule[];
+  workLogs: WorkLog[];
+  progressLogs: ProgressLog[];
+  reflections: Reflection[];
+  initialTaskId?: string;
+}) {
+  const [tasks, setTasks] = useState(initialTasks);
+  const [filter, setFilter] = useState<"open" | "all" | TaskStatus>("open");
+  const [dateFilter, setDateFilter] = useState("all");
+  const [project, setProject] = useState("");
+  const [priority, setPriority] = useState("");
+  const [sort, setSort] = useState("created");
+  const [selected, setSelected] = useState<Task | null>(
+    initialTasks.find((t) => t.id === initialTaskId) ?? null,
+  );
+  const [quick, setQuick] = useState("");
+  const [notice, setNotice] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
+  const [markdown, setMarkdown] = useState("");
+  const [pending, startTransition] = useTransition();
   const today = localDate(new Date().toISOString());
-  const shown = useMemo(() => tasks.filter(t => {
-    const due = localDate(t.due_at);
-    const matchesDate = dateFilter === "all" || (dateFilter === "today" && due === today) || (dateFilter === "overdue" && !!due && due < today && t.status !== "done") || (dateFilter === "no-due" && !due);
-    return (filter === "all" || (filter === "open" ? t.status !== "done" : t.status === filter)) && matchesDate && (!project || t.project_id === project) && (!priority || t.priority === priority);
-  }).sort((a,b) => sort === "due" ? (a.due_at ?? "9999").localeCompare(b.due_at ?? "9999") : sort === "priority" ? ({high:0,medium:1,low:2}[a.priority]-({high:0,medium:1,low:2}[b.priority])) : a.created_at.localeCompare(b.created_at)), [tasks, filter, dateFilter, project, priority, sort, today]);
+  const shown = useMemo(
+    () =>
+      tasks
+        .filter((t) => {
+          const due = localDate(t.due_at);
+          const matchesDate =
+            dateFilter === "all" ||
+            (dateFilter === "today" && due === today) ||
+            (dateFilter === "overdue" &&
+              !!due &&
+              due < today &&
+              t.status !== "done") ||
+            (dateFilter === "no-due" && !due);
+          return (
+            (filter === "all" ||
+              (filter === "open"
+                ? t.status !== "done"
+                : t.status === filter)) &&
+            matchesDate &&
+            (!project || t.project_id === project) &&
+            (!priority || t.priority === priority)
+          );
+        })
+        .sort((a, b) =>
+          sort === "due"
+            ? (a.due_at ?? "9999").localeCompare(b.due_at ?? "9999")
+            : sort === "priority"
+              ? { high: 0, medium: 1, low: 2 }[a.priority] -
+                { high: 0, medium: 1, low: 2 }[b.priority]
+              : a.created_at.localeCompare(b.created_at),
+        ),
+    [tasks, filter, dateFilter, project, priority, sort, today],
+  );
   const tree = useMemo(() => buildTaskTree(shown), [shown]);
-  const runningTaskIds = useMemo(() => new Set(workLogs.filter(log => !log.ended_at).map(log => log.task_id)), [workLogs]);
-  const run = (action: Promise<{error?: string; ok?: boolean}>, optimistic?: () => void) => startTransition(async () => { const previous = tasks; optimistic?.(); const result = await action; if (result.error) { setTasks(previous); setNotice(`エラー: ${result.error}`); } else { setNotice("保存しました"); location.reload(); } });
-  const add = (parent_id: string | null = null) => { const title = prompt(parent_id ? "子タスクのタイトル" : "タスクのタイトル"); if (title) run(createTask({ title, parent_id, project_id: project || null })); };
-  const exportText = async () => { const text = toMarkdown(tree); await navigator.clipboard.writeText(text); setNotice(`${tree.length ? "表示中のタスクを" : "空の内容を"}コピーしました`); };
-  const submitQuick = () => { const titles = quick.split(/\r?\n/).map(title => title.trim()).filter(Boolean); if (!titles.length) return; run(createTasks(titles.map(title => ({ title, project_id: project || null })))); };
-  return <div className="space-y-4">
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <form onSubmit={e => e.preventDefault()}><label htmlFor="quick-task" className="text-sm font-semibold text-slate-700">タスクの名前を入力する</label><textarea id="quick-task" rows={1} value={quick} onChange={e=>setQuick(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&e.shiftKey&&!e.nativeEvent.isComposing&&!pending){e.preventDefault();submitQuick();}}} className={`${inputClass} mt-2 min-h-10 resize-y`} placeholder="例：企画書を作成する" aria-describedby="quick-task-help"/><p id="quick-task-help" className="mt-2 text-xs text-slate-500"><b>Enter</b> で改行します。<b>Shift + Enter</b> で追加すると、1行につき1件のタスクをまとめて登録できます。</p></form>
-      <div className="mt-4 border-t border-slate-100 pt-4"><div className="mb-2 flex items-center justify-between"><p className="text-xs font-bold text-slate-500">絞り込み・並び替え</p>{(filter!=="open"||dateFilter!=="all"||project||priority)&&<button type="button" onClick={()=>{setFilter("open");setDateFilter("all");setProject("");setPriority("");}} className="text-xs font-semibold text-indigo-600">フィルターをクリア</button>}</div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5"><select aria-label="ステータスで絞り込み" value={filter} onChange={e=>setFilter(e.target.value as typeof filter)} className={inputClass}><option value="open">状態：未完了</option><option value="all">状態：すべて</option><option value="todo">状態：未着手</option><option value="doing">状態：進行中</option><option value="done">状態：完了</option></select><select aria-label="期限で絞り込み" value={dateFilter} onChange={e=>setDateFilter(e.target.value)} className={inputClass}><option value="all">期限：すべて</option><option value="today">期限：本日</option><option value="overdue">期限：期限切れ</option><option value="no-due">期限：設定なし</option></select><select value={project} onChange={e=>setProject(e.target.value)} className={inputClass}><option value="">全プロジェクト</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><select value={priority} onChange={e=>setPriority(e.target.value)} className={inputClass}><option value="">全優先度</option><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select><select aria-label="並び替え" value={sort} onChange={e=>setSort(e.target.value)} className={inputClass}><option value="created">並び順：作成順</option><option value="due">並び順：期限順</option><option value="priority">並び順：優先度順</option></select></div><div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3"><button onClick={()=>setImportOpen(true)} type="button" className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100">Import</button><button onClick={exportText} type="button" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100">Export</button></div></div>
+  const actionableShown = useMemo(
+    () =>
+      shown.filter(
+        (task) => !tasks.some((child) => child.parent_id === task.id),
+      ),
+    [shown, tasks],
+  );
+  const runningTaskIds = useMemo(
+    () =>
+      new Set(
+        workLogs.filter((log) => !log.ended_at).map((log) => log.task_id),
+      ),
+    [workLogs],
+  );
+  const run = (
+    action: Promise<{ error?: string; ok?: boolean }>,
+    optimistic?: () => void,
+  ) =>
+    startTransition(async () => {
+      const previous = tasks;
+      optimistic?.();
+      const result = await action;
+      if (result.error) {
+        setTasks(previous);
+        setNotice(`エラー: ${result.error}`);
+      } else {
+        setNotice("保存しました");
+        location.reload();
+      }
+    });
+  const add = (parent_id: string | null = null) => {
+    const title = prompt(parent_id ? "子タスクのタイトル" : "タスクのタイトル");
+    if (title)
+      run(createTask({ title, parent_id, project_id: project || null }));
+  };
+  const exportText = async () => {
+    const text = toMarkdown(tree);
+    await navigator.clipboard.writeText(text);
+    setNotice(
+      `${tree.length ? "表示中のタスクを" : "空の内容を"}コピーしました`,
+    );
+  };
+  const submitQuick = () => {
+    const titles = quick
+      .split(/\r?\n/)
+      .map((title) => title.trim())
+      .filter(Boolean);
+    if (!titles.length) return;
+    run(
+      createTasks(
+        titles.map((title) => ({ title, project_id: project || null })),
+      ),
+    );
+  };
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <form onSubmit={(e) => e.preventDefault()}>
+          <label
+            htmlFor="quick-task"
+            className="text-sm font-semibold text-slate-700"
+          >
+            タスクの名前を入力する
+          </label>
+          <textarea
+            id="quick-task"
+            rows={1}
+            value={quick}
+            onChange={(e) => setQuick(e.target.value)}
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                e.shiftKey &&
+                !e.nativeEvent.isComposing &&
+                !pending
+              ) {
+                e.preventDefault();
+                submitQuick();
+              }
+            }}
+            className={`${inputClass} mt-2 min-h-10 resize-y`}
+            placeholder="例：企画書を作成する"
+            aria-describedby="quick-task-help"
+          />
+          <p id="quick-task-help" className="mt-2 text-xs text-slate-500">
+            <b>Enter</b> で改行します。<b>Shift + Enter</b>{" "}
+            で追加すると、1行につき1件のタスクをまとめて登録できます。
+          </p>
+        </form>
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-500">
+              絞り込み・並び替え
+            </p>
+            {(filter !== "open" ||
+              dateFilter !== "all" ||
+              project ||
+              priority) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilter("open");
+                  setDateFilter("all");
+                  setProject("");
+                  setPriority("");
+                }}
+                className="text-xs font-semibold text-indigo-600"
+              >
+                フィルターをクリア
+              </button>
+            )}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+            <select
+              aria-label="ステータスで絞り込み"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as typeof filter)}
+              className={inputClass}
+            >
+              <option value="open">状態：未完了</option>
+              <option value="all">状態：すべて</option>
+              <option value="todo">状態：未着手</option>
+              <option value="doing">状態：進行中</option>
+              <option value="done">状態：完了</option>
+            </select>
+            <select
+              aria-label="期限で絞り込み"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className={inputClass}
+            >
+              <option value="all">期限：すべて</option>
+              <option value="today">期限：本日</option>
+              <option value="overdue">期限：期限切れ</option>
+              <option value="no-due">期限：設定なし</option>
+            </select>
+            <select
+              value={project}
+              onChange={(e) => setProject(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">全プロジェクト</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">全優先度</option>
+              <option value="high">高</option>
+              <option value="medium">中</option>
+              <option value="low">低</option>
+            </select>
+            <select
+              aria-label="並び替え"
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className={inputClass}
+            >
+              <option value="created">並び順：作成順</option>
+              <option value="due">並び順：期限順</option>
+              <option value="priority">並び順：優先度順</option>
+            </select>
+          </div>
+          <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3">
+            <button
+              onClick={() => setImportOpen(true)}
+              type="button"
+              className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
+            >
+              Import
+            </button>
+            <button
+              onClick={exportText}
+              type="button"
+              className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+            >
+              Export
+            </button>
+          </div>
+        </div>
+      </div>
+      {runningTaskIds.size > 0 && (
+        <section className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
+          <p className="text-xs font-bold text-indigo-700">● 作業開始中</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {tasks
+              .filter((task) => runningTaskIds.has(task.id))
+              .map((task) => (
+                <button
+                  key={task.id}
+                  onClick={() => setSelected(task)}
+                  className="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm"
+                >
+                  {task.title}
+                </button>
+              ))}
+          </div>
+        </section>
+      )}
+      {notice && (
+        <div
+          role="status"
+          className={`rounded-lg px-4 py-2 text-sm ${notice.startsWith("エラー") ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}
+        >
+          {notice}
+          <button onClick={() => setNotice("")} className="float-right">
+            ×
+          </button>
+        </div>
+      )}
+      <section className="grid grid-cols-2 gap-2 rounded-2xl border bg-white p-4 text-center sm:grid-cols-5">
+        <div>
+          <b>{actionableShown.length}</b>
+          <span className="block text-xs text-slate-400">タスク</span>
+        </div>
+        <div>
+          <b>{actionableShown.filter((t) => t.status === "done").length}</b>
+          <span className="block text-xs text-slate-400">完了</span>
+        </div>
+        <div>
+          <b>{actionableShown.filter((t) => t.status === "doing").length}</b>
+          <span className="block text-xs text-slate-400">進行中</span>
+        </div>
+        <div>
+          <b>{actionableShown.filter((t) => t.status === "todo").length}</b>
+          <span className="block text-xs text-slate-400">未着手</span>
+        </div>
+        <div>
+          <b>{averageProgress(actionableShown.map((t) => t.progress))}%</b>
+          <span className="block text-xs text-slate-400">平均進捗</span>
+        </div>
+      </section>
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {tree.length ? (
+          <div>
+            {tree.map((n) => (
+              <TaskRow
+                key={n.id}
+                node={n}
+                workLogs={workLogs}
+                runningTaskIds={runningTaskIds}
+                actual={totalWorkMinutes(
+                  workLogs.filter((l) => l.task_id === n.id),
+                )}
+                projects={projects}
+                onSelect={setSelected}
+                onToggle={(node, done) =>
+                  run(toggleTask(node.id, done), () =>
+                    setTasks((current) =>
+                      current.map((t) =>
+                        t.id === node.id
+                          ? {
+                              ...t,
+                              status: done ? "done" : "todo",
+                              progress: done ? 100 : 0,
+                            }
+                          : t,
+                      ),
+                    ),
+                  )
+                }
+                onAdd={add}
+                onDueChange={(node, due_at) =>
+                  run(updateTask(node.id, { title: node.title, due_at }))
+                }
+                onDelete={(node) => run(deleteTask(node.id))}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="grid min-h-64 place-items-center p-8 text-center">
+            <div>
+              <p className="font-semibold">タスクがありません</p>
+              <p className="mt-2 text-sm text-slate-500">
+                最初のタスクを追加しましょう。
+              </p>
+              <button
+                onClick={() => add()}
+                className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white"
+              >
+                ＋ タスクを追加
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+      {selected && (
+        <TaskDrawer
+          isFolder={tasks.some((t) => t.parent_id === selected.id)}
+          task={selected}
+          projects={projects}
+          schedules={schedules.filter((s) => s.task_id === selected.id)}
+          logs={workLogs.filter((l) => l.task_id === selected.id)}
+          onClose={() => setSelected(null)}
+          onSave={(input) => run(updateTask(selected.id, input))}
+          history={progressLogs.filter((l) => l.task_id === selected.id)}
+          reflection={
+            reflections.find((r) => r.task_id === selected.id) ?? null
+          }
+        />
+      )}
+      {importOpen && (
+        <ImportDialog
+          markdown={markdown}
+          setMarkdown={setMarkdown}
+          onClose={() => setImportOpen(false)}
+          onImport={() => run(importTasks(markdown, project || undefined))}
+        />
+      )}
     </div>
-    {runningTaskIds.size>0&&<section className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4"><p className="text-xs font-bold text-indigo-700">● 作業開始中</p><div className="mt-2 flex flex-wrap gap-2">{tasks.filter(task=>runningTaskIds.has(task.id)).map(task=><button key={task.id} onClick={()=>setSelected(task)} className="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm">{task.title}</button>)}</div></section>}
-    {notice && <div role="status" className={`rounded-lg px-4 py-2 text-sm ${notice.startsWith("エラー")?"bg-red-50 text-red-700":"bg-emerald-50 text-emerald-700"}`}>{notice}<button onClick={()=>setNotice("")} className="float-right">×</button></div>}
-    <section className="grid grid-cols-2 gap-2 rounded-2xl border bg-white p-4 text-center sm:grid-cols-5"><div><b>{shown.length}</b><span className="block text-xs text-slate-400">タスク</span></div><div><b>{shown.filter(t=>t.status==="done").length}</b><span className="block text-xs text-slate-400">完了</span></div><div><b>{shown.filter(t=>t.status==="doing").length}</b><span className="block text-xs text-slate-400">進行中</span></div><div><b>{shown.filter(t=>t.status==="todo").length}</b><span className="block text-xs text-slate-400">未着手</span></div><div><b>{averageProgress(shown.map(t=>t.progress))}%</b><span className="block text-xs text-slate-400">平均進捗</span></div></section>
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">{tree.length ? <div>{tree.map(n=><TaskRow key={n.id} node={n} workLogs={workLogs} runningTaskIds={runningTaskIds} actual={totalWorkMinutes(workLogs.filter(l=>l.task_id===n.id))} projects={projects} onSelect={setSelected} onToggle={(node, done)=>run(toggleTask(node.id,done),()=>setTasks(current=>current.map(t=>t.id===node.id?{...t,status:done?"done":"todo",progress:done?100:0}:t)))} onAdd={add} onDueChange={(node,due_at)=>run(updateTask(node.id,{title:node.title,due_at}))} onDelete={node=>run(deleteTask(node.id))}/>)}</div> : <div className="grid min-h-64 place-items-center p-8 text-center"><div><p className="font-semibold">タスクがありません</p><p className="mt-2 text-sm text-slate-500">最初のタスクを追加しましょう。</p><button onClick={()=>add()} className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white">＋ タスクを追加</button></div></div>}</section>
-    {selected && <TaskDrawer task={selected} projects={projects} schedules={schedules.filter(s=>s.task_id===selected.id)} logs={workLogs.filter(l=>l.task_id===selected.id)} onClose={()=>setSelected(null)} onSave={input=>run(updateTask(selected.id,input))} history={progressLogs.filter(l=>l.task_id===selected.id)} reflection={reflections.find(r=>r.task_id===selected.id)??null}/>}
-    {importOpen && <ImportDialog markdown={markdown} setMarkdown={setMarkdown} onClose={()=>setImportOpen(false)} onImport={()=>run(importTasks(markdown,project||undefined))}/>}
-  </div>;
+  );
 }
 
-function TaskRow({node,projects,actual,workLogs,runningTaskIds,onSelect,onToggle,onAdd,onDueChange,onDelete}:{node:TaskNode;projects:Project[];actual:number;workLogs:WorkLog[];runningTaskIds:Set<string>;onSelect:(t:Task)=>void;onToggle:(t:TaskNode,d:boolean)=>void;onAdd:(id:string)=>void;onDueChange:(t:TaskNode,dueAt:string|null)=>void;onDelete:(t:TaskNode)=>void}) {
-  const checkbox=useRef<HTMLInputElement>(null); const state=taskCheckState(node); if(checkbox.current) checkbox.current.indeterminate=state==="indeterminate";
-  const statusClass = {todo:"bg-slate-100 text-slate-600",doing:"bg-amber-100 text-amber-700",done:"bg-emerald-100 text-emerald-700"}[node.status];
-  return <><article className={`group border-b border-slate-100 px-3 py-3 hover:bg-slate-50 ${node.status==="done"?"opacity-60":""}`} style={{paddingLeft:`${12+node.depth*24}px`}}><div className="flex items-start gap-3"><input ref={checkbox} type="checkbox" checked={state==="checked"} onChange={e=>onToggle(node,e.target.checked)} className="mt-1 size-4 accent-emerald-600"/><div className="min-w-0 flex-1"><button onClick={()=>onSelect(node)} className="block w-full min-w-0 text-left"><span className={`block truncate text-sm font-medium ${node.status==="done"?"line-through":""}`} title={node.title}>{node.title}</span></button><div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500"><span className={`rounded-full px-2 py-0.5 font-bold ${statusClass}`}>{statusLabel[node.status]}</span>{runningTaskIds.has(node.id)&&<span className="font-bold text-indigo-600">● 作業中</span>}<span>優先度 {priorityLabel[node.priority]}</span>{node.project_id&&<span className="max-w-36 truncate">{projects.find(p=>p.id===node.project_id)?.name}</span>}<label className="flex items-center gap-1">期限<input aria-label={`${node.title}の期限`} type="date" value={localDate(node.due_at)} onChange={e=>onDueChange(node,e.target.value?new Date(`${e.target.value}T23:59:59`).toISOString():null)} className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-600"/></label></div><div className="mt-2 flex items-center gap-2"><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label={`${node.title}の進捗`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={node.progress}><div className="h-full rounded-full bg-emerald-500 transition-all" style={{width:`${node.progress}%`}}/></div><span className="w-9 text-right text-xs font-bold text-emerald-700">{node.progress}%</span></div><p className="mt-1 text-xs text-slate-500">予定 {node.estimated_minutes??0}分 / 実績 {actual}分</p></div><div className="flex shrink-0 flex-wrap justify-end gap-1"><button onClick={()=>onSelect(node)} title="編集" className="rounded p-1.5 text-slate-400 hover:bg-slate-200">✎</button>{node.depth<2&&<button onClick={()=>onAdd(node.id)} className="rounded border border-indigo-100 bg-indigo-50 px-2 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">子タスクを追加</button>}<button onClick={()=>onDelete(node)} title="削除" aria-label={`${node.title}を削除`} className="rounded bg-red-50 px-2 py-1 text-lg font-bold leading-none text-red-600 hover:bg-red-100 hover:text-red-700">×</button></div></div></article>{node.children.map(c=><TaskRow key={c.id} node={c} workLogs={workLogs} runningTaskIds={runningTaskIds} actual={totalWorkMinutes(workLogs.filter(l=>l.task_id===c.id))} projects={projects} onSelect={onSelect} onToggle={onToggle} onAdd={onAdd} onDueChange={onDueChange} onDelete={onDelete}/>)}</>;
+function TaskRow({
+  node,
+  projects,
+  actual,
+  workLogs,
+  runningTaskIds,
+  onSelect,
+  onToggle,
+  onAdd,
+  onDueChange,
+  onDelete,
+}: {
+  node: TaskNode;
+  projects: Project[];
+  actual: number;
+  workLogs: WorkLog[];
+  runningTaskIds: Set<string>;
+  onSelect: (t: Task) => void;
+  onToggle: (t: TaskNode, d: boolean) => void;
+  onAdd: (id: string) => void;
+  onDueChange: (t: TaskNode, dueAt: string | null) => void;
+  onDelete: (t: TaskNode) => void;
+}) {
+  const checkbox = useRef<HTMLInputElement>(null);
+  const isFolder = node.children.length > 0;
+  const state = taskCheckState(node);
+  if (checkbox.current)
+    checkbox.current.indeterminate = state === "indeterminate";
+  const statusClass = {
+    todo: "bg-slate-100 text-slate-600",
+    doing: "bg-amber-100 text-amber-700",
+    done: "bg-emerald-100 text-emerald-700",
+  }[node.status];
+  return (
+    <>
+      <article
+        className={`group border-b border-slate-100 px-3 py-3 hover:bg-slate-50 ${node.status === "done" ? "opacity-60" : ""}`}
+        style={{ paddingLeft: `${12 + node.depth * 24}px` }}
+      >
+        <div className="flex items-start gap-3">
+          {isFolder ? (
+            <span className="mt-0.5 text-lg" aria-label="フォルダ">
+              📁
+            </span>
+          ) : (
+            <input
+              ref={checkbox}
+              type="checkbox"
+              checked={state === "checked"}
+              onChange={(e) => onToggle(node, e.target.checked)}
+              className="mt-1 size-4 accent-emerald-600"
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <button
+              onClick={() => onSelect(node)}
+              className="block w-full min-w-0 text-left"
+            >
+              <span
+                className={`block truncate text-sm font-medium ${node.status === "done" ? "line-through" : ""}`}
+                title={node.title}
+              >
+                {node.title}
+              </span>
+            </button>
+            {isFolder ? (
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-bold text-indigo-700">
+                  フォルダ
+                </span>
+                <span>{node.children.length}件の子タスク</span>
+              </div>
+            ) : (
+              <>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span
+                    className={`rounded-full px-2 py-0.5 font-bold ${statusClass}`}
+                  >
+                    {statusLabel[node.status]}
+                  </span>
+                  {runningTaskIds.has(node.id) && (
+                    <span className="font-bold text-indigo-600">● 作業中</span>
+                  )}
+                  <span>優先度 {priorityLabel[node.priority]}</span>
+                  {node.project_id && (
+                    <span className="max-w-36 truncate">
+                      {projects.find((p) => p.id === node.project_id)?.name}
+                    </span>
+                  )}
+                  <label className="flex items-center gap-1">
+                    期限
+                    <input
+                      aria-label={`${node.title}の期限`}
+                      type="date"
+                      value={localDate(node.due_at)}
+                      onChange={(e) =>
+                        onDueChange(
+                          node,
+                          e.target.value
+                            ? new Date(
+                                `${e.target.value}T23:59:59`,
+                              ).toISOString()
+                            : null,
+                        )
+                      }
+                      className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-600"
+                    />
+                  </label>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <div
+                    className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200"
+                    role="progressbar"
+                    aria-label={`${node.title}の進捗`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={node.progress}
+                  >
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all"
+                      style={{ width: `${node.progress}%` }}
+                    />
+                  </div>
+                  <span className="w-9 text-right text-xs font-bold text-emerald-700">
+                    {node.progress}%
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  予定 {node.estimated_minutes ?? 0}分 / 実績 {actual}分
+                </p>
+              </>
+            )}{" "}
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-1">
+            <button
+              onClick={() => onSelect(node)}
+              title="編集"
+              className="rounded p-1.5 text-slate-400 hover:bg-slate-200"
+            >
+              ✎
+            </button>
+            {node.depth < 2 && (
+              <button
+                onClick={() => onAdd(node.id)}
+                className="rounded border border-indigo-100 bg-indigo-50 px-2 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+              >
+                子タスクを追加
+              </button>
+            )}
+            <button
+              onClick={() => onDelete(node)}
+              title="削除"
+              aria-label={`${node.title}を削除`}
+              className="rounded bg-red-50 px-2 py-1 text-lg font-bold leading-none text-red-600 hover:bg-red-100 hover:text-red-700"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      </article>
+      {node.children.map((c) => (
+        <TaskRow
+          key={c.id}
+          node={c}
+          workLogs={workLogs}
+          runningTaskIds={runningTaskIds}
+          actual={totalWorkMinutes(workLogs.filter((l) => l.task_id === c.id))}
+          projects={projects}
+          onSelect={onSelect}
+          onToggle={onToggle}
+          onAdd={onAdd}
+          onDueChange={onDueChange}
+          onDelete={onDelete}
+        />
+      ))}
+    </>
+  );
 }
 
-function TaskDrawer({task,projects,schedules,logs,history,reflection,onClose,onSave}:{task:Task;projects:Project[];schedules:TaskSchedule[];logs:WorkLog[];history:ProgressLog[];reflection:Reflection|null;onClose:()=>void;onSave:(i:TaskInput)=>void}) { const [form,setForm]=useState({...task,due_at:localDate(task.due_at)}); const set=(key:string,value:unknown)=>setForm(f=>({...f,[key]:value})); return <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/40 p-4" onMouseDown={onClose}><section role="dialog" aria-modal="true" aria-labelledby="task-detail-title" onMouseDown={e=>e.stopPropagation()} className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-center justify-between"><h2 id="task-detail-title" className="text-xl font-bold">タスク詳細</h2><button type="button" aria-label="閉じる" onClick={onClose} className="text-2xl text-slate-400">×</button></div><form onSubmit={e=>{e.preventDefault();onSave({...form,due_at:form.due_at?new Date(`${form.due_at}T23:59:59`).toISOString():null});onClose();}} className="mt-6 space-y-4"><Field label="タイトル"><input required value={form.title} onChange={e=>set("title",e.target.value)} className={inputClass}/></Field><Field label="説明"><textarea value={form.description??""} onChange={e=>set("description",e.target.value)} className={`${inputClass} min-h-24`}/></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Project"><select value={form.project_id??""} onChange={e=>set("project_id",e.target.value||null)} className={inputClass}><option value="">なし</option>{projects.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></Field><Field label="優先度"><select value={form.priority} onChange={e=>set("priority",e.target.value)} className={inputClass}>{Object.entries(priorityLabel).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></Field><Field label="ステータス"><select value={form.status} onChange={e=>set("status",e.target.value)} className={inputClass}>{Object.entries(statusLabel).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></Field><Field label={`進捗 ${form.progress}%`}><input aria-label="タスク進捗スライダー" type="range" min="0" max="100" value={form.progress} onChange={e=>set("progress",Number(e.target.value))} className="block w-full accent-indigo-600"/></Field><Field label="予定時間 (分)"><input type="number" min="0" value={form.estimated_minutes??""} onChange={e=>set("estimated_minutes",e.target.value?Number(e.target.value):null)} className={inputClass}/><span className="mt-1 flex flex-wrap gap-1">{[15,30,45,60,90,120].map(m=><button type="button" key={m} onClick={()=>set("estimated_minutes",m)} className="rounded border px-1.5 py-1 text-xs">{m}分</button>)}</span></Field><Field label="期限"><input type="date" value={form.due_at} onChange={e=>set("due_at",e.target.value)} className={inputClass}/></Field></div><button className="w-full rounded-lg bg-indigo-600 py-2.5 font-semibold text-white">保存</button></form><PlanActualPanel task={task} schedules={schedules} logs={logs}/><ProgressReflectionPanel task={task} history={history} reflection={reflection}/></section></div>; }
-function Field({label,children}:{label:string;children:React.ReactNode}) { return <label className="block text-sm font-medium text-slate-600">{label}<div className="mt-1.5">{children}</div></label>; }
-function ImportDialog({markdown,setMarkdown,onClose,onImport}:{markdown:string;setMarkdown:(v:string)=>void;onClose:()=>void;onImport:()=>void}) { const preview=parseMarkdown(markdown); return <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/40 p-4"><section className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl"><h2 className="text-lg font-bold">Markdown Import</h2><p className="mt-1 text-sm text-slate-500">2スペースのインデントで最大3階層、予・実の時間も読み込みます。</p><textarea autoFocus value={markdown} onChange={e=>setMarkdown(e.target.value)} className={`${inputClass} mt-4 min-h-48 font-mono`} placeholder={'- [ ] テスト （予：40分 / 実：100分）\n- [ ] テスト２ （予：40分 / 実：60分）'}/><p className="mt-2 text-sm">プレビュー: {preview.length}件（完了 {preview.filter(t=>t.done).length}件 / 予定 {preview.reduce((n,t)=>n+(t.estimatedMinutes??0),0)}分 / 実績 {preview.reduce((n,t)=>n+(t.actualMinutes??0),0)}分）</p><div className="mt-5 flex justify-end gap-2"><button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm">キャンセル</button><button disabled={!preview.length} onClick={()=>{onImport();onClose();}} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50">読み込む</button></div></section></div>; }
+function TaskDrawer({
+  task,
+  isFolder,
+  projects,
+  schedules,
+  logs,
+  history,
+  reflection,
+  onClose,
+  onSave,
+}: {
+  task: Task;
+  isFolder: boolean;
+  projects: Project[];
+  schedules: TaskSchedule[];
+  logs: WorkLog[];
+  history: ProgressLog[];
+  reflection: Reflection | null;
+  onClose: () => void;
+  onSave: (i: TaskInput) => void;
+}) {
+  const [form, setForm] = useState({ ...task, due_at: localDate(task.due_at) });
+  const set = (key: string, value: unknown) =>
+    setForm((f) => ({ ...f, [key]: value }));
+  return (
+    <div
+      className="fixed inset-0 z-40 grid place-items-center bg-slate-900/40 p-4"
+      onMouseDown={onClose}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="task-detail-title"
+        onMouseDown={(e) => e.stopPropagation()}
+        className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+      >
+        <div className="flex items-center justify-between">
+          <h2 id="task-detail-title" className="text-xl font-bold">
+            {isFolder ? "フォルダ詳細" : "タスク詳細"}
+          </h2>
+          <button
+            type="button"
+            aria-label="閉じる"
+            onClick={onClose}
+            className="text-2xl text-slate-400"
+          >
+            ×
+          </button>
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSave({
+              ...form,
+              due_at: form.due_at
+                ? new Date(`${form.due_at}T23:59:59`).toISOString()
+                : null,
+            });
+            onClose();
+          }}
+          className="mt-6 space-y-4"
+        >
+          <Field label="タイトル">
+            <input
+              required
+              value={form.title}
+              onChange={(e) => set("title", e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="説明">
+            <textarea
+              value={form.description ?? ""}
+              onChange={(e) => set("description", e.target.value)}
+              className={`${inputClass} min-h-24`}
+            />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Project">
+              <select
+                value={form.project_id ?? ""}
+                onChange={(e) => set("project_id", e.target.value || null)}
+                className={inputClass}
+              >
+                <option value="">なし</option>
+                {projects.map((p) => (
+                  <option value={p.id} key={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {!isFolder && (
+              <>
+                <Field label="優先度">
+                  <select
+                    value={form.priority}
+                    onChange={(e) => set("priority", e.target.value)}
+                    className={inputClass}
+                  >
+                    {Object.entries(priorityLabel).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="ステータス">
+                  <select
+                    value={form.status}
+                    onChange={(e) => set("status", e.target.value)}
+                    className={inputClass}
+                  >
+                    {Object.entries(statusLabel).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label={`進捗 ${form.progress}%`}>
+                  <input
+                    aria-label="タスク進捗スライダー"
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={form.progress}
+                    onChange={(e) => set("progress", Number(e.target.value))}
+                    className="block w-full accent-indigo-600"
+                  />
+                </Field>
+                <Field label="予定時間 (分)">
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.estimated_minutes ?? ""}
+                    onChange={(e) =>
+                      set(
+                        "estimated_minutes",
+                        e.target.value ? Number(e.target.value) : null,
+                      )
+                    }
+                    className={inputClass}
+                  />
+                  <span className="mt-1 flex flex-wrap gap-1">
+                    {[15, 30, 45, 60, 90, 120].map((m) => (
+                      <button
+                        type="button"
+                        key={m}
+                        onClick={() => set("estimated_minutes", m)}
+                        className="rounded border px-1.5 py-1 text-xs"
+                      >
+                        {m}分
+                      </button>
+                    ))}
+                  </span>
+                </Field>
+                <Field label="期限">
+                  <input
+                    type="date"
+                    value={form.due_at}
+                    onChange={(e) => set("due_at", e.target.value)}
+                    className={inputClass}
+                  />
+                </Field>
+              </>
+            )}
+          </div>
+          <button className="w-full rounded-lg bg-indigo-600 py-2.5 font-semibold text-white">
+            保存
+          </button>
+        </form>
+        {!isFolder && (
+          <>
+            <PlanActualPanel task={task} schedules={schedules} logs={logs} />
+            <ProgressReflectionPanel
+              task={task}
+              history={history}
+              reflection={reflection}
+            />
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block text-sm font-medium text-slate-600">
+      {label}
+      <div className="mt-1.5">{children}</div>
+    </label>
+  );
+}
+function ImportDialog({
+  markdown,
+  setMarkdown,
+  onClose,
+  onImport,
+}: {
+  markdown: string;
+  setMarkdown: (v: string) => void;
+  onClose: () => void;
+  onImport: () => void;
+}) {
+  const preview = parseMarkdown(markdown);
+  return (
+    <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/40 p-4">
+      <section className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
+        <h2 className="text-lg font-bold">Markdown Import</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          2スペースのインデントで最大3階層、予・実の時間も読み込みます。
+        </p>
+        <textarea
+          autoFocus
+          value={markdown}
+          onChange={(e) => setMarkdown(e.target.value)}
+          className={`${inputClass} mt-4 min-h-48 font-mono`}
+          placeholder={
+            "- [ ] テスト （予：40分 / 実：100分）\n- [ ] テスト２ （予：40分 / 実：60分）"
+          }
+        />
+        <p className="mt-2 text-sm">
+          プレビュー: {preview.length}件（完了{" "}
+          {preview.filter((t) => t.done).length}件 / 予定{" "}
+          {preview.reduce((n, t) => n + (t.estimatedMinutes ?? 0), 0)}分 / 実績{" "}
+          {preview.reduce((n, t) => n + (t.actualMinutes ?? 0), 0)}分）
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="rounded-lg border px-4 py-2 text-sm"
+          >
+            キャンセル
+          </button>
+          <button
+            disabled={!preview.length}
+            onClick={() => {
+              onImport();
+              onClose();
+            }}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+          >
+            読み込む
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
