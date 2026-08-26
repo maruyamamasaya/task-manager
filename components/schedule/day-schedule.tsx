@@ -8,7 +8,7 @@ import { holidayName } from "@/lib/time/japanese-holidays";
 import type { DayOff, Project, Task, TaskSchedule, WorkLog } from "@/types/database";
 import { DatabaseUpdating } from "@/components/ui/database-updating";
 
-const START_HOUR = 9;
+const START_HOUR = 8;
 const END_HOUR = 20;
 const HOUR_HEIGHT = 76;
 const MINUTES_PER_STEP = 15;
@@ -166,7 +166,7 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
             <strong>{dropPreview.title}</strong>
             <small>{valueFromMinutes(dropPreview.offset)}–{valueFromMinutes(dropPreview.offset + Math.min(dropPreview.duration, (END_HOUR - START_HOUR) * 60 - dropPreview.offset))}</small>
           </div>}
-          {!schedules.length && <div className="timeline-empty"><span>＋</span><strong>タスクをここにドロップ</strong><small>9:00〜20:00の間に予定を配置できます</small></div>}
+          {!schedules.length && <div className="timeline-empty"><span>＋</span><strong>タスクをここにドロップ</strong><small>{START_HOUR}:00〜{END_HOUR}:00の間に予定を配置できます</small></div>}
         </div>
       </div>
     </section>
