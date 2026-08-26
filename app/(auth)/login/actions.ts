@@ -13,7 +13,7 @@ export async function login(_: LoginState, formData: FormData): Promise<LoginSta
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: "ログインできませんでした。入力内容を確認してください。" };
   const requested = String(formData.get("next") ?? "");
-  redirect(requested.startsWith("/") && !requested.startsWith("//") ? requested : "/dashboard");
+  redirect(requested.startsWith("/") && !requested.startsWith("//") ? requested : "/today");
 }
 
 export async function logout() {

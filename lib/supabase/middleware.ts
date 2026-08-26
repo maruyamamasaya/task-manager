@@ -23,6 +23,6 @@ export async function updateSession(request: NextRequest) {
     url.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
-  if (user && isLogin) return NextResponse.redirect(new URL("/dashboard", request.url));
+  if (user && isLogin) return NextResponse.redirect(new URL("/today", request.url));
   return response;
 }
