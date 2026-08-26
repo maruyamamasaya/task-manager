@@ -97,10 +97,10 @@ export async function updateTask(id: string, input: TaskInput) {
 }
 export async function toggleTask(id: string, done: boolean) {
   const { db } = await context();
-  const { error } = await db.rpc("set_task_completion", {
-    target_id: id,
-    is_done: done,
-  });
+  const { error } = await db.from("tasks").update({
+    status: done ? "done" : "todo",
+    completed_at: done ? new Date().toISOString() : null,
+  }).eq("id", id);
   if (error) return { error: error.message };
   refresh();
   return { ok: true };
@@ -143,7 +143,7 @@ export async function importTasks(markdown: string, projectId?: string) {
         parent_id: task.parentIndex === null ? null : ids[task.parentIndex],
         project_id: projectId || null,
         status: !folderIndexes.has(index) && task.done ? "done" : "todo",
-        progress: !folderIndexes.has(index) && task.done ? 100 : 0,
+        progress: 0,
         estimated_minutes: folderIndexes.has(index)
           ? null
           : task.estimatedMinutes,
