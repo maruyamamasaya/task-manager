@@ -1,15 +1,15 @@
 "use client";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   createTask,
   createTasks,
   deleteTask,
   importTasks,
-  toggleTask,
   updateTask,
+  updateTaskOrder,
   type TaskInput,
 } from "@/app/(app)/tasks/actions";
-import { buildTaskTree, taskCheckState, type TaskNode } from "@/lib/tasks/tree";
+import { buildTaskTree, type TaskNode } from "@/lib/tasks/tree";
 import { parseMarkdown, toMarkdown } from "@/lib/tasks/markdown";
 import type {
   Project,
@@ -23,7 +23,6 @@ import type {
 import { PlanActualPanel } from "./plan-actual-panel";
 import { totalWorkMinutes } from "@/lib/time/phase3";
 import { ProgressReflectionPanel } from "./progress-reflection-panel";
-import { averageProgress } from "@/lib/tasks/phase4";
 import { DatabaseUpdating } from "@/components/ui/database-updating";
 import { addWorkLog, saveSchedule } from "@/app/(app)/phase3-actions";
 import { Pagination } from "@/components/ui/pagination";
@@ -76,6 +75,8 @@ export function TaskManager({
   const [quick, setQuick] = useState("");
   const [notice, setNotice] = useState("");
   const [importOpen, setImportOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [markdown, setMarkdown] = useState("");
   const [pending, startTransition] = useTransition();
   const today = localDate(new Date().toISOString());
@@ -110,7 +111,9 @@ export function TaskManager({
             : sort === "priority"
               ? { high: 0, medium: 1, low: 2 }[a.priority] -
                 { high: 0, medium: 1, low: 2 }[b.priority]
-              : a.created_at.localeCompare(b.created_at);
+              : sort === "manual"
+                ? a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at)
+                : a.created_at.localeCompare(b.created_at);
           return sortDirection === "asc" ? result : -result;
         }),
     [tasks, filter, dateFilter, project, priority, sort, sortDirection, today],
@@ -119,13 +122,6 @@ export function TaskManager({
   const currentPage = Math.min(page, totalPages);
   const pagedTasks = useMemo(() => shown.slice((currentPage - 1) * TASKS_PER_PAGE, currentPage * TASKS_PER_PAGE), [shown, currentPage]);
   const tree = useMemo(() => buildTaskTree(pagedTasks), [pagedTasks]);
-  const actionableShown = useMemo(
-    () =>
-      shown.filter(
-        (task) => !tasks.some((child) => child.parent_id === task.id),
-      ),
-    [shown, tasks],
-  );
   const runningTaskIds = useMemo(
     () =>
       new Set(
@@ -173,6 +169,35 @@ export function TaskManager({
       ),
     );
   };
+  const moveTask = (draggedId: string, targetId: string) => {
+    if (draggedId === targetId) return;
+    const dragged = tasks.find((task) => task.id === draggedId);
+    const target = tasks.find((task) => task.id === targetId);
+    if (!dragged || !target || dragged.parent_id !== target.parent_id) {
+      setNotice("同じ階層のタスク同士で並び替えてください");
+      return;
+    }
+    const siblings = tasks
+      .filter((task) => task.parent_id === dragged.parent_id)
+      .sort(
+        (a, b) =>
+          a.sort_order - b.sort_order ||
+          a.created_at.localeCompare(b.created_at),
+      );
+    const reordered = siblings.filter((task) => task.id !== draggedId);
+    reordered.splice(reordered.findIndex((task) => task.id === targetId), 0, dragged);
+    const order = new Map(reordered.map((task, index) => [task.id, index]));
+    setSort("manual");
+    run(updateTaskOrder(reordered.map((task) => task.id)), () =>
+      setTasks((current) =>
+        current.map((task) =>
+          order.has(task.id)
+            ? { ...task, sort_order: order.get(task.id)! }
+            : task,
+        ),
+      ),
+    );
+  };
   return (
     <div className="space-y-4">
       <DatabaseUpdating active={pending} />
@@ -210,10 +235,17 @@ export function TaskManager({
           </p>
         </form>
         <div className="mt-4 border-t border-slate-100 pt-4">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-bold text-slate-500">
-              絞り込み・並び替え
-            </p>
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setToolsOpen((open) => !open)}
+              aria-expanded={toolsOpen}
+              aria-controls="task-tools"
+              className="flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-indigo-700"
+            >
+              <span aria-hidden="true">{toolsOpen ? "▾" : "▸"}</span>
+              絞り込み・並び替え・入出力
+            </button>
             {(filter !== "open" ||
               dateFilter !== "all" ||
               project ||
@@ -233,7 +265,9 @@ export function TaskManager({
               </button>
             )}
           </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+          {toolsOpen && (
+            <div id="task-tools" className="mt-3">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
             <select
               aria-label="ステータスで絞り込み"
               value={filter}
@@ -286,6 +320,7 @@ export function TaskManager({
               className={inputClass}
             >
               <option value="created">並び順：作成順</option>
+              <option value="manual">並び順：自由</option>
               <option value="title">並び順：タイトル順</option>
               <option value="due">並び順：期限順</option>
               <option value="priority">並び順：優先度順</option>
@@ -294,8 +329,8 @@ export function TaskManager({
               <option value="asc">順序：昇順</option>
               <option value="desc">順序：降順</option>
             </select>
-          </div>
-          <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3">
+              </div>
+              <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3">
             <button
               onClick={() => setImportOpen(true)}
               type="button"
@@ -310,7 +345,9 @@ export function TaskManager({
             >
               Export
             </button>
-          </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       {runningTaskIds.size > 0 && (
@@ -342,28 +379,6 @@ export function TaskManager({
           </button>
         </div>
       )}
-      <section className="grid grid-cols-2 gap-2 rounded-2xl border bg-white p-4 text-center sm:grid-cols-5">
-        <div>
-          <b>{actionableShown.length}</b>
-          <span className="block text-xs text-slate-400">タスク</span>
-        </div>
-        <div>
-          <b>{actionableShown.filter((t) => t.status === "done").length}</b>
-          <span className="block text-xs text-slate-400">完了</span>
-        </div>
-        <div>
-          <b>{actionableShown.filter((t) => t.status === "doing").length}</b>
-          <span className="block text-xs text-slate-400">進行中</span>
-        </div>
-        <div>
-          <b>{actionableShown.filter((t) => t.status === "todo").length}</b>
-          <span className="block text-xs text-slate-400">未着手</span>
-        </div>
-        <div>
-          <b>{averageProgress(actionableShown.map((t) => t.progress))}%</b>
-          <span className="block text-xs text-slate-400">平均進捗</span>
-        </div>
-      </section>
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {tree.length ? (
           <div>
@@ -378,24 +393,35 @@ export function TaskManager({
                 )}
                 projects={projects}
                 onSelect={setSelected}
-                onToggle={(node, done) =>
-                  run(toggleTask(node.id, done), () =>
+                onStatusChange={(node, status) =>
+                  run(updateTask(node.id, { ...node, status }), () =>
                     setTasks((current) =>
                       current.map((t) =>
                         t.id === node.id
-                          ? {
-                              ...t,
-                              status: done ? "done" : "todo",
-                              progress: t.progress,
-                            }
+                          ? { ...t, status }
                           : t,
                       ),
                     ),
                   )
                 }
+                onPriorityChange={(node, priority) =>
+                  run(updateTask(node.id, { ...node, priority }), () =>
+                    setTasks((current) =>
+                      current.map((task) =>
+                        task.id === node.id ? { ...task, priority } : task,
+                      ),
+                    ),
+                  )
+                }
+                draggedTaskId={draggedTaskId}
+                onDragStart={setDraggedTaskId}
+                onDrop={(targetId) => {
+                  if (draggedTaskId) moveTask(draggedTaskId, targetId);
+                  setDraggedTaskId(null);
+                }}
                 onAdd={add}
                 onDueChange={(node, due_at) =>
-                  run(updateTask(node.id, { title: node.title, due_at }))
+                  run(updateTask(node.id, { ...node, due_at }))
                 }
                 onDelete={(node) => run(deleteTask(node.id))}
               />
@@ -466,7 +492,11 @@ function TaskRow({
   workLogs,
   runningTaskIds,
   onSelect,
-  onToggle,
+  onStatusChange,
+  onPriorityChange,
+  draggedTaskId,
+  onDragStart,
+  onDrop,
   onAdd,
   onDueChange,
   onDelete,
@@ -477,16 +507,16 @@ function TaskRow({
   workLogs: WorkLog[];
   runningTaskIds: Set<string>;
   onSelect: (t: Task) => void;
-  onToggle: (t: TaskNode, d: boolean) => void;
+  onStatusChange: (t: TaskNode, status: TaskStatus) => void;
+  onPriorityChange: (t: TaskNode, priority: Task["priority"]) => void;
+  draggedTaskId: string | null;
+  onDragStart: (id: string | null) => void;
+  onDrop: (id: string) => void;
   onAdd: (id: string) => void;
   onDueChange: (t: TaskNode, dueAt: string | null) => void;
   onDelete: (t: TaskNode) => void;
 }) {
-  const checkbox = useRef<HTMLInputElement>(null);
   const isFolder = node.children.length > 0;
-  const state = taskCheckState(node);
-  if (checkbox.current)
-    checkbox.current.indeterminate = state === "indeterminate";
   const statusClass = {
     todo: "bg-slate-100 text-slate-600",
     doing: "bg-amber-100 text-amber-700",
@@ -495,23 +525,22 @@ function TaskRow({
   return (
     <>
       <article
-        className={`group border-b border-slate-100 px-3 py-3 hover:bg-slate-50 ${node.status === "done" ? "opacity-60" : ""}`}
+        draggable
+        onDragStart={() => onDragStart(node.id)}
+        onDragEnd={() => onDragStart(null)}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onDrop(node.id);
+        }}
+        className={`group border-b border-slate-100 px-3 py-3 hover:bg-slate-50 ${node.status === "done" ? "opacity-60" : ""} ${draggedTaskId === node.id ? "bg-indigo-50 opacity-50" : ""}`}
         style={{ paddingLeft: `${12 + node.depth * 24}px` }}
       >
         <div className="flex items-start gap-3">
-          {isFolder ? (
-            <span className="mt-0.5 text-lg" aria-label="フォルダ">
-              📁
-            </span>
-          ) : (
-            <input
-              ref={checkbox}
-              type="checkbox"
-              checked={state === "checked"}
-              onChange={(e) => onToggle(node, e.target.checked)}
-              className="mt-1 size-4 accent-emerald-600"
-            />
-          )}
+          <span className="mt-0.5 cursor-grab text-lg text-slate-400" aria-label={isFolder ? "フォルダ。ドラッグして並び替え" : "ドラッグして並び替え"}>
+            {isFolder ? "📁" : "⠿"}
+          </span>
           <div className="min-w-0 flex-1">
             <button
               onClick={() => onSelect(node)}
@@ -534,19 +563,35 @@ function TaskRow({
             ) : (
               <>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                  <span
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onStatusChange(
+                        node,
+                        ({ todo: "doing", doing: "done", done: "todo" } as const)[node.status],
+                      )
+                    }
+                    aria-label={`${node.title}のステータスを変更`}
                     className={`rounded-full px-2 py-0.5 font-bold ${statusClass}`}
                   >
                     {statusLabel[node.status]}
-                  </span>
+                  </button>
                   {runningTaskIds.has(node.id) && (
                     <span className="font-bold text-indigo-600">● 作業中</span>
                   )}
-                  <span
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onPriorityChange(
+                        node,
+                        ({ high: "medium", medium: "low", low: "high" } as const)[node.priority],
+                      )
+                    }
+                    aria-label={`${node.title}の優先度を変更`}
                     className={`rounded-full border px-2.5 py-1 font-bold ${priorityClass[node.priority]}`}
                   >
                     優先度 {priorityLabel[node.priority]}
-                  </span>
+                  </button>
                   {node.project_id && (
                     <span className="max-w-36 truncate">
                       {projects.find((p) => p.id === node.project_id)?.name}
@@ -632,7 +677,11 @@ function TaskRow({
           actual={totalWorkMinutes(workLogs.filter((l) => l.task_id === c.id))}
           projects={projects}
           onSelect={onSelect}
-          onToggle={onToggle}
+          onStatusChange={onStatusChange}
+          onPriorityChange={onPriorityChange}
+          draggedTaskId={draggedTaskId}
+          onDragStart={onDragStart}
+          onDrop={onDrop}
           onAdd={onAdd}
           onDueChange={onDueChange}
           onDelete={onDelete}
