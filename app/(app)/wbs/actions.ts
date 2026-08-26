@@ -20,6 +20,11 @@ export async function createWbsProject(form:FormData){
     throw new Error("ログインユーザーを確認できませんでした。再ログインしてください。");
   }
 
+  console.log("WBS owner check",{
+    authenticated:!!user,
+    userId:user.id,
+  });
+
   const name=String(form.get("name")??"").trim();
   const description=String(form.get("description")??"").trim();
   if(!name)throw new Error("WBS名を入力してください。");
@@ -40,13 +45,7 @@ export async function createWbsProject(form:FormData){
     if(!error){projectId=data.id;break;}
     if(error.code==="23505"&&attempt<MAX_SHARE_CODE_ATTEMPTS)continue;
 
-    console.error("WBS create error:",{
-      code:error.code,
-      message:error.message,
-      details:error.details,
-      hint:error.hint,
-      attempt,
-    });
+    console.error("WBS create error:",error);
     throw new Error(process.env.NODE_ENV==="development"
       ?`WBSを作成できませんでした。code=${error.code}, message=${error.message}`
       :"WBSを作成できませんでした。");
