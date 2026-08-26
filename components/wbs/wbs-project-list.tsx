@@ -1,3 +1,50 @@
 "use client";
-import { useActionState,useState } from "react"; import Link from "next/link"; import { joinWbsProject } from "@/app/(app)/wbs/actions"; import type { WbsProjectSummary } from "@/lib/wbs/types"; import { roleLabel } from "@/lib/wbs/permissions";
-export function WbsProjectList({projects}:{projects:WbsProjectSummary[]}){const [filter,setFilter]=useState<"all"|"owner"|"shared">("all");const [state,action,pending]=useActionState(joinWbsProject,{error:undefined,ok:undefined} as {error?:string;ok?:string});const shown=projects.filter(p=>filter==="all"||(filter==="owner"?p.role==="owner":p.role!=="owner"));return <div className="space-y-5"><section className="rounded-xl border border-slate-200 bg-white p-4"><form action={action} className="flex flex-wrap items-end gap-3"><label className="flex-1 text-sm font-medium text-slate-700">プロジェクトに参加<input name="shareCode" placeholder="WBSP-7K4M-X92Q" className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 uppercase" required/></label><button disabled={pending} className="rounded-lg border border-indigo-600 px-4 py-2 text-sm font-semibold text-indigo-700">{pending?"処理中…":"参加する"}</button></form>{state.error&&<p className="mt-2 text-sm text-red-600">{state.error}</p>}{state.ok&&<p className="mt-2 text-sm text-emerald-700">{state.ok}</p>}</section><div className="flex gap-2">{([["all","すべて"],["owner","自分が作成"],["shared","共有されたWBS"]] as const).map(([key,label])=><button key={key} onClick={()=>setFilter(key)} className={`rounded-full px-3 py-1.5 text-sm ${filter===key?"bg-indigo-600 text-white":"bg-slate-100 text-slate-600"}`}>{label}</button>)}</div>{shown.length===0?<section className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center"><h2 className="font-semibold">まだWBSがありません</h2><p className="mt-2 text-sm text-slate-500">プロジェクトの作業を階層化して管理できます。</p><Link href="/wbs/new" className="mt-5 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white">最初のWBSを作成</Link></section>:<div className="grid gap-4 lg:grid-cols-2">{shown.map(p=><Link href={`/wbs/${p.id}`} key={p.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-300"><div className="flex justify-between"><h2 className="font-semibold text-slate-900">{p.name}</h2><span className="rounded-full bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700">{roleLabel(p.role)}</span></div><p className="mt-2 line-clamp-2 text-sm text-slate-500">{p.description||"説明はありません"}</p><div className="mt-5 flex justify-between text-sm"><span>進捗 {p.progress}% · {p.itemCount}項目</span><span>{new Date(p.updated_at).toLocaleDateString("ja-JP")}</span></div><div className="mt-2 h-1.5 rounded bg-slate-100"><div className="h-full rounded bg-indigo-500" style={{width:`${p.progress}%`}}/></div></Link>)}</div>}</div>}
+
+import { useActionState, useState } from "react";
+import Link from "next/link";
+import { joinWbsProject } from "@/app/(app)/wbs/actions";
+import type { WbsProjectSummary } from "@/lib/wbs/types";
+import { roleLabel } from "@/lib/wbs/permissions";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Progress } from "@/components/ui/progress";
+
+export function WbsProjectList({ projects }: { projects: WbsProjectSummary[] }) {
+  const [filter, setFilter] = useState<"all" | "owner" | "shared">("all");
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [state, action, pending] = useActionState(joinWbsProject, {} as { error?: string; ok?: string });
+  const shown = projects.filter((project) => filter === "all" || (filter === "owner" ? project.role === "owner" : project.role !== "owner"));
+
+  return <div>
+    <div className="mb-5 flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex border-b border-slate-200" role="tablist" aria-label="WBSの絞り込み">
+        {([['all', 'すべて'], ['owner', '自分が作成'], ['shared', '共有されたWBS']] as const).map(([key, label]) =>
+          <button key={key} role="tab" aria-selected={filter === key} onClick={() => setFilter(key)} className={`-mb-px min-h-10 border-b-2 px-3 text-sm font-medium transition-colors ${filter === key ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>{label}</button>
+        )}
+      </div>
+      <Button variant="secondary" onClick={() => setJoinOpen(true)}>プロジェクトに参加</Button>
+    </div>
+
+    {shown.length === 0 ? <EmptyState title="WBSはまだありません" description="作業を階層化して、プロジェクト全体の進捗を管理できます。" action={<div className="flex flex-col items-center gap-3"><Link href="/wbs/new" className="inline-flex min-h-9 items-center rounded-lg bg-indigo-600 px-3.5 text-sm font-medium text-white hover:bg-indigo-700">新規WBS</Link><button className="text-sm font-medium text-slate-600 hover:text-indigo-700" onClick={() => setJoinOpen(true)}>共有プロジェクトに参加</button></div>} /> :
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {shown.map((project) => <Link href={`/wbs/${project.id}`} key={project.id} className="group rounded-xl border border-slate-200 bg-white p-5 transition-colors hover:border-indigo-300 hover:bg-slate-50/50 focus-visible:ring-2 focus-visible:ring-indigo-500">
+          <div className="flex items-start justify-between gap-3"><h2 className="truncate text-sm font-semibold text-slate-950 group-hover:text-indigo-700">{project.name}</h2><span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600">{roleLabel(project.role)}</span></div>
+          <div className="mt-5 flex items-center justify-between text-xs"><span className="font-medium text-slate-700">{project.progress}% 完了</span><span className="text-slate-400">{project.status === "active" ? "Active" : project.status}</span></div>
+          <Progress value={project.progress} className="mt-2" />
+          <div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-xs text-slate-500"><span>{project.itemCount}項目</span><time dateTime={project.updated_at}>更新 {new Date(project.updated_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric" })}</time></div>
+        </Link>)}
+      </div>}
+
+    {joinOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setJoinOpen(false)}>
+      <section role="dialog" aria-modal="true" aria-labelledby="join-title" className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
+        <h2 id="join-title" className="text-lg font-semibold text-slate-950">プロジェクトに参加</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-500">共有されたプロジェクトコードを入力してください。</p>
+        <form action={action} className="mt-5">
+          <label className="text-sm font-medium text-slate-700">共有コード<input name="shareCode" placeholder="WBSP-____-____" autoFocus required className="mt-1.5 block min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm uppercase outline-none focus:border-indigo-500" /></label>
+          {state.error && <p className="mt-2 text-sm text-red-600" role="alert">{state.error}</p>}{state.ok && <p className="mt-2 text-sm text-emerald-700" role="status">{state.ok}</p>}
+          <div className="mt-6 flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setJoinOpen(false)}>キャンセル</Button><Button disabled={pending}>{pending ? "処理中…" : "参加"}</Button></div>
+        </form>
+      </section>
+    </div>}
+  </div>;
+}
