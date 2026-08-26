@@ -1,0 +1,4 @@
+import { flattenWbs } from "./hierarchy"; import type { WbsItem } from "./types";
+const safe=(value:unknown,user=false)=>{let text=value==null?"":String(value);if(user&&/^[=+\-@]/.test(text))text=`'${text}`;return `"${text.replaceAll('"','""')}"`};
+export function createWbsCsv(items:WbsItem[]){const rows=flattenWbs(items),codes=new Map(rows.map(r=>[r.item.id,r.code]));const header=["ID","WBS","Parent","Task","Description","Start","End","Owner","Status","Progress","Estimate","Actual","Note"];
+return "\uFEFF"+[header.map(v=>safe(v)).join(","),...rows.map(({item,code})=>[item.id,code,item.parent_id?codes.get(item.parent_id):"",item.name,item.description,item.start_date,item.end_date,item.owner_name,item.status,item.progress,item.estimate_hours,item.actual_hours,item.note].map((v,i)=>safe(v,[3,4,7,12].includes(i))).join(","))].join("\r\n")}
