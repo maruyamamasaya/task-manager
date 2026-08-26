@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Icon } from "@/components/ui/icon";
 
 export function CopyDailyReport({ markdown }: { markdown: string }) {
   const [copied, setCopied] = useState(false);
@@ -15,9 +16,9 @@ export function CopyDailyReport({ markdown }: { markdown: string }) {
     <button
       type="button"
       onClick={copy}
-      className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100"
+      className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
     >
-      {copied ? "コピーしました ✓" : "Markdownをコピー"}
+      <Icon name="clipboard" className="size-4" />{copied ? "コピーしました" : "報告をコピー"}
     </button>
   );
 }

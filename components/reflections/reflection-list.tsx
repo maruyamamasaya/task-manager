@@ -20,11 +20,11 @@ export function ReflectionList({ items, detail = false }: { items: Item[]; detai
   const currentPage = Math.min(page, totalPages);
   const visible = items.slice((currentPage - 1) * REFLECTIONS_PER_PAGE, currentPage * REFLECTIONS_PER_PAGE);
 
-  if (!items.length) return <p className="rounded-2xl border bg-white p-12 text-center text-slate-400">{detail ? "振り返りが見つかりません" : "振り返りはまだありません"}</p>;
+  if (!items.length) return <p className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-500">{detail ? "振り返りが見つかりません" : "振り返りはまだありません"}</p>;
 
   return <div className="space-y-4">
     {visible.map(item => <ReflectionCard key={item.reflection.id} {...item} initiallyOpen={detail} />)}
-    <div className="overflow-hidden rounded-2xl border bg-white">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
       <Pagination page={currentPage} totalItems={items.length} pageSize={REFLECTIONS_PER_PAGE} onPageChange={setPage} />
     </div>
   </div>;

@@ -1,3 +1,3 @@
-export function PageHeader({ title, description }: { title: string; description: string }) {
-  return <header className="mb-8"><p className="mb-2 text-[11px] font-bold uppercase tracking-[0.22em] text-indigo-500">Workspace</p><h1 className="text-3xl font-bold tracking-[-0.035em] text-slate-950 sm:text-4xl">{title}</h1><p className="mt-2.5 text-sm leading-relaxed text-slate-500">{description}</p></header>;
+export function PageHeader({ title, description, action, eyebrow }: { title: string; description?: string; action?: React.ReactNode; eyebrow?: string }) {
+  return <header className="mb-6 flex flex-col gap-3 border-b border-slate-200/80 pb-5 sm:flex-row sm:items-end sm:justify-between"><div>{eyebrow && <p className="mb-1 text-xs font-medium text-indigo-600">{eyebrow}</p>}<h1 className="text-2xl font-semibold tracking-tight text-slate-950">{title}</h1>{description && <p className="mt-1.5 text-sm leading-6 text-slate-500">{description}</p>}</div>{action && <div className="shrink-0">{action}</div>}</header>;
 }
