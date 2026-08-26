@@ -1,6 +1,6 @@
 "use client";
 
-import { DragEvent, useMemo, useState, useTransition } from "react";
+import { CSSProperties, DragEvent, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteSchedule, saveSchedule } from "@/app/(app)/phase3-actions";
 import { dailyTotals, formatTokyo, overlaps, scheduleMarkdown, scheduleMinutes, tokyoDateTime, varianceLabel } from "@/lib/time/phase3";
@@ -12,7 +12,7 @@ const START_HOUR = 8;
 const END_HOUR = 20;
 const HOUR_HEIGHT = 76;
 const MINUTES_PER_STEP = 15;
-const COLORS = ["violet", "sky", "amber", "emerald", "rose"] as const;
+const UNCLASSIFIED_COLOR = "#94a3b8";
 
 type DraggingTask = { taskId: string; scheduleId?: string; duration: number; title: string };
 type DropPreview = DraggingTask & { offset: number };
@@ -51,6 +51,8 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
   const [pending, go] = useTransition();
   const totals = dailyTotals(schedules, logs);
   const taskMap = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
+  const projectColorMap = useMemo(() => new Map(projects.map((project) => [project.id, project.color ?? UNCLASSIFIED_COLOR])), [projects]);
+  const taskColor = (task?: Task) => task?.project_id ? projectColorMap.get(task.project_id) ?? UNCLASSIFIED_COLOR : UNCLASSIFIED_COLOR;
   const visibleTasks = useMemo(() => tasks.filter((task) => projectId === "all" || (projectId === "unclassified" ? !task.project_id : task.project_id === projectId)), [tasks, projectId]);
   const copySchedule = async () => { await navigator.clipboard.writeText(scheduleMarkdown(date,schedules,new Map(tasks.map(t=>[t.id,t.title])))); setMessage("Markdown形式のスケジュールをコピーしました"); };
   const openTaskDetails = (selectedTaskId: string) => router.push(`/tasks?task=${selectedTaskId}`);
@@ -103,13 +105,14 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
       <p className="palette-help">タスクをクリック、または右の時間軸へドラッグしてください。</p>
       <label className="project-task-filter"><span>プロジェクト</span><select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="all">すべてのプロジェクト</option><option value="unclassified">未分類</option>{projects.map((project)=><option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
       <div className="task-block-list">
-        {visibleTasks.map((task, index) => <button
+        {visibleTasks.map((task) => <button
           key={task.id}
           draggable={Boolean(task.estimated_minutes)}
           onDragStart={(event) => { if (!task.estimated_minutes) { event.preventDefault(); selectTask(task); return; } event.dataTransfer.setData("task-id", task.id); event.dataTransfer.effectAllowed = "copy"; setDragging({ taskId: task.id, duration: task.estimated_minutes, title: task.title }); }}
           onDragEnd={finishDragging}
           onClick={() => selectTask(task)}
-          className={`palette-task palette-task--${COLORS[index % COLORS.length]} ${taskId === task.id ? "is-selected" : ""} ${!task.estimated_minutes ? "is-unavailable" : ""}`}
+          className={`palette-task ${taskId === task.id ? "is-selected" : ""} ${!task.estimated_minutes ? "is-unavailable" : ""}`}
+          style={{ "--task": taskColor(task), "--task-bg": `color-mix(in srgb, ${taskColor(task)} 10%, white)` } as CSSProperties}
         >
           <span className="task-grip" aria-hidden="true">⠿</span>
           <span className="palette-task-body"><strong>{task.title}</strong><small>{dueLabel(task.due_at)}</small></span>
@@ -135,7 +138,7 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
           onDrop={dropOnTimeline}
         >
           {Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, index) => <div key={index} className="timeline-hour" style={{ top: index * HOUR_HEIGHT }}><time>{String(START_HOUR + index).padStart(2, "0")}:00</time><span /></div>)}
-          {schedules.map((schedule, index) => {
+          {schedules.map((schedule) => {
             const task = taskMap.get(schedule.task_id);
             const startValue = timeValue(new Date(schedule.start_at));
             const top = minutesFromStart(startValue) / 60 * HOUR_HEIGHT;
@@ -151,8 +154,8 @@ export function DaySchedule({ date, tasks, projects, schedules, logs, dayOff }: 
               onClick={(event) => event.shiftKey ? openTaskDetails(schedule.task_id) : setTaskId(schedule.task_id)}
               onContextMenu={(event) => { event.preventDefault(); openTaskDetails(schedule.task_id); }}
               title="Shift＋クリックまたは右クリックでタスク詳細を開く"
-              className={`timeline-task timeline-task--${COLORS[index % COLORS.length]} ${conflict ? "has-conflict" : ""}`}
-              style={{ top, height }}
+              className={`timeline-task ${conflict ? "has-conflict" : ""}`}
+              style={{ top, height, "--task": taskColor(task), "--task-bg": `color-mix(in srgb, ${taskColor(task)} 10%, white)` } as CSSProperties}
             >
               <span className="timeline-task-time">{startValue}–{endValue}</span>
               <strong>{task?.title ?? "削除されたタスク"}</strong>

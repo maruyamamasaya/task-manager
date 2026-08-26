@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   createTask,
   createTasks,
@@ -31,6 +31,7 @@ import { addWorkLog } from "@/app/(app)/phase3-actions";
 import { Pagination } from "@/components/ui/pagination";
 
 const TASKS_PER_PAGE = 40;
+const FILTER_STORAGE_KEY = "taskflow:tasks-view";
 
 const statusLabel = { todo: "未着手", doing: "進行中", done: "完了" };
 const priorityLabel = { low: "低", medium: "中", high: "高" };
@@ -84,6 +85,21 @@ export function TaskManager({
   } | null>(null);
   const [markdown, setMarkdown] = useState("");
   const [pending, startTransition] = useTransition();
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) ?? "null");
+      if (!saved) return;
+      if (["open", "all", "todo", "doing", "done"].includes(saved.filter)) setFilter(saved.filter);
+      if (["all", "today", "overdue", "no-due"].includes(saved.dateFilter)) setDateFilter(saved.dateFilter);
+      if (typeof saved.project === "string") setProject(saved.project);
+      if (["", "low", "medium", "high"].includes(saved.priority)) setPriority(saved.priority);
+      if (["created", "manual", "title", "due", "priority"].includes(saved.sort)) setSort(saved.sort);
+      if (["asc", "desc"].includes(saved.sortDirection)) setSortDirection(saved.sortDirection);
+    } catch { localStorage.removeItem(FILTER_STORAGE_KEY); }
+  }, []);
+  useEffect(() => {
+    localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({ filter, dateFilter, project, priority, sort, sortDirection }));
+  }, [filter, dateFilter, project, priority, sort, sortDirection]);
   const today = localDate(new Date().toISOString());
   const shown = useMemo(
     () =>
@@ -743,12 +759,24 @@ function TaskDrawer({
 }) {
   const [form, setForm] = useState({ ...task, due_at: localDate(task.due_at) });
   const [actualMinutes, setActualMinutes] = useState<number[]>([]);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const initialForm = useMemo(() => ({ ...task, due_at: localDate(task.due_at) }), [task]);
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm) || actualMinutes.length > 0;
+  const requestClose = () => isDirty ? setConfirmClose(true) : onClose();
+  useEffect(() => {
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [isDirty]);
   const set = (key: string, value: unknown) =>
     setForm((f) => ({ ...f, [key]: value }));
   return (
     <div
       className="fixed inset-0 z-40 grid place-items-center bg-slate-900/40 p-4"
-      onMouseDown={onClose}
+      onMouseDown={requestClose}
     >
       <section
         role="dialog"
@@ -764,7 +792,7 @@ function TaskDrawer({
           <button
             type="button"
             aria-label="閉じる"
-            onClick={onClose}
+            onClick={requestClose}
             className="text-2xl text-slate-400"
           >
             ×
@@ -872,12 +900,14 @@ function TaskDrawer({
                   </span>
                 </Field>
                 <Field label="期限">
-                  <input
-                    type="date"
-                    value={form.due_at}
-                    onChange={(e) => set("due_at", e.target.value)}
-                    className={inputClass}
-                  />
+                  <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
+                    <input type="date" value={form.due_at} onChange={(e) => set("due_at", e.target.value)} className={`${inputClass} font-semibold text-slate-700`} />
+                    <div className="mt-2 grid grid-cols-4 gap-1.5">
+                      {([['今日', 0], ['明日', 1], ['1週間後', 7]] as const).map(([label, days]) => <button key={label} type="button" onClick={() => { const date = new Date(); date.setDate(date.getDate() + days); set("due_at", localDate(date.toISOString())); }} className="rounded-lg bg-white px-2 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm ring-1 ring-indigo-100 hover:bg-indigo-100">{label}</button>)}
+                      <button type="button" onClick={() => set("due_at", "")} className="rounded-lg bg-white px-2 py-1.5 text-xs font-semibold text-slate-500 shadow-sm ring-1 ring-slate-200 hover:bg-slate-100">クリア</button>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">日付欄のカレンダーアイコンから月表示で選択できます。</p>
+                  </div>
                 </Field>
               </>
             )}
@@ -909,6 +939,14 @@ function TaskDrawer({
           </>
         )}
       </section>
+      {confirmClose && <div className="absolute inset-0 z-10 grid place-items-center bg-slate-950/45 p-4" onMouseDown={(event) => event.stopPropagation()}>
+        <section role="alertdialog" aria-modal="true" aria-labelledby="unsaved-title" className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
+          <span className="mx-auto grid size-11 place-items-center rounded-full bg-amber-100 text-xl font-bold text-amber-700">!</span>
+          <h3 id="unsaved-title" className="mt-3 text-lg font-bold text-slate-900">変更が保存されていません</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-500">入力した内容を破棄してタスク詳細を閉じますか？</p>
+          <div className="mt-5 flex gap-2"><button autoFocus type="button" onClick={() => setConfirmClose(false)} className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold">編集を続ける</button><button type="button" onClick={onClose} className="flex-1 rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white">破棄して閉じる</button></div>
+        </section>
+      </div>}
     </div>
   );
 }
