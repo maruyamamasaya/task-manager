@@ -12,4 +12,12 @@ export function nextWbsCode(items:WbsItem[],parentId:string|null){const parent=p
 export function wouldCreateCycle(items:WbsItem[],itemId:string,parentId:string|null){if(!parentId)return false;const byId=new Map(items.map(i=>[i.id,i]));let cursor:string|null=parentId;while(cursor){if(cursor===itemId)return true;cursor=byId.get(cursor)?.parent_id??null}return false}
 export function leafProgress(items:WbsItem[]){if(!items.length)return 0;const parents=new Set(items.flatMap(i=>i.parent_id?[i.parent_id]:[]));const leaves=items.filter(i=>!parents.has(i.id));return Math.round(leaves.reduce((sum,i)=>sum+i.progress,0)/Math.max(1,leaves.length))}
 
+export function leafEffortTotals(items:WbsItem[]){
+  const parents=new Set(items.flatMap(item=>item.parent_id?[item.parent_id]:[]));
+  return items.filter(item=>!parents.has(item.id)).reduce((totals,item)=>({
+    estimate:totals.estimate+(item.estimate_hours??0),
+    actual:totals.actual+(item.actual_hours??0),
+  }),{estimate:0,actual:0});
+}
+
 export function isWbsItemOverdue(item:WbsItem,today:string){return !!item.end_date&&item.end_date<today&&item.status!=="completed"&&item.status!=="on_hold"}
