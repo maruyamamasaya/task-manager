@@ -20,6 +20,8 @@ const paths = {
   close: <path d="m6 6 12 12M18 6 6 18"/>,
   chevron: <path d="m8 10 4 4 4-4"/>,
   download: <><path d="M12 3v12m-5-5 5 5 5-5"/><path d="M5 21h14"/></>,
+  panelClose: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m7-12-4 4 4 4"/></>,
+  panelOpen: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m4-12 4 4-4 4"/></>,
 } as const;
 
 export type IconName = keyof typeof paths;
