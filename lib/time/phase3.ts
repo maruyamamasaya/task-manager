@@ -21,7 +21,7 @@ export function tokyoDateKey(value: string | Date) {
   return `${parts.find(p=>p.type==="year")!.value}-${parts.find(p=>p.type==="month")!.value}-${parts.find(p=>p.type==="day")!.value}`;
 }
 export function tokyoDayBounds(dateKey: string) { const start = new Date(`${dateKey}T00:00:00+09:00`); return { start: start.toISOString(), end: new Date(start.getTime()+86400000).toISOString() }; }
-export function dailyTotals(schedules: {start_at:string;end_at:string}[], logs: MinuteLog[]) { const planned=schedules.reduce((n,s)=>n+scheduleMinutes(s),0), actual=totalWorkMinutes(logs); return {planned,actual,difference:actual-planned}; }
+export function dailyTotals(schedules: {start_at:string;end_at:string}[], logs: MinuteLog[], meetings: {start_at:string;end_at:string}[] = []) { const planned=[...schedules,...meetings].reduce((n,s)=>n+scheduleMinutes(s),0), actual=totalWorkMinutes(logs); return {planned,actual,difference:actual-planned}; }
 export function tokyoDateTime(date: string, time: string) { return new Date(`${date}T${time}:00+09:00`).toISOString(); }
 export function formatTokyo(value: string, options: Intl.DateTimeFormatOptions = {}) { return new Intl.DateTimeFormat("ja-JP", {timeZone:TOKYO_TIME_ZONE,...options}).format(new Date(value)); }
 export function scheduleMarkdown(date: string, schedules: {start_at:string;end_at:string;task_id:string}[], titles: Map<string,string>) {
