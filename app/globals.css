@@ -66,8 +66,15 @@ button:disabled { cursor: not-allowed; }
 .calendar-grid time { display:block; color:#475569; font-size:12px; font-weight:750; }
 .schedule-calendar--month .calendar-grid span { display:block; width:max-content; margin-top:19px; padding:4px 8px; border-radius:20px; color:#a0a8b5; font-size:10px; }
 .schedule-calendar--month .calendar-grid span.has-items { background:#eef2ff; color:#4f46e5; font-weight:800; }
-.schedule-calendar--week .calendar-grid>a { min-height:420px; }.schedule-calendar--week .calendar-grid div { margin-top:12px; }
+.schedule-calendar--week .calendar-grid>a { min-height:420px; }.schedule-calendar--week .calendar-grid>a>div { margin-top:12px; }
 .schedule-calendar--week .calendar-grid p { margin:0 0 7px; padding:7px 8px; overflow:hidden; border-left:3px solid #6366f1; border-radius:4px; background:#f5f7ff; color:#334155; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+.week-timeline { position:relative; display:flex; flex-direction:column; gap:7px; margin:0; padding:0; list-style:none; }
+.week-timeline::before { position:absolute; top:5px; bottom:5px; left:37px; width:1px; background:#dbe2ec; content:""; }
+.week-timeline li { position:relative; display:grid; grid-template-columns:34px minmax(0,1fr); gap:8px; align-items:start; min-width:0; color:#334155; font-size:10px; }
+.week-timeline li::before { position:absolute; top:5px; left:35px; width:5px; height:5px; border:2px solid #fff; border-radius:50%; background:#6366f1; box-shadow:0 0 0 1px #6366f1; content:""; }
+.week-timeline time { color:#64748b; font:700 9px/1.4 ui-monospace,monospace; }
+.week-timeline span { overflow:hidden; padding-left:4px; font-weight:650; line-height:1.4; text-overflow:ellipsis; white-space:nowrap; }
+.week-timeline li.week-meeting::before { background:#0f766e; box-shadow:0 0 0 1px #0f766e; }
 .calendar-grid .day-off-label { display:block; margin-top:4px; overflow:hidden; color:#bd5260; font-size:9px; font-weight:750; text-overflow:ellipsis; white-space:nowrap; }.schedule-calendar--week .calendar-grid p.week-leave { border-left-color:#e36b78; background:#fff0f1; color:#ad4351; }
 .schedule-workspace { display:grid; grid-template-columns:320px minmax(0,1fr); min-height:720px; overflow:hidden; border:1px solid #dfe5ee; border-radius:20px; background:#fff; box-shadow:0 14px 45px #3341550d; }
 .task-palette { display:flex; min-width:0; flex-direction:column; padding:24px 20px; border-right:1px solid #e5eaf1; background:#fbfcfe; }
