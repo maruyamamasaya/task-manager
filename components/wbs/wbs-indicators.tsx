@@ -1,10 +1,10 @@
 import type { WbsItemStatus } from "@/lib/wbs/types";
 
 export const wbsStatusLabel: Record<WbsItemStatus, string> = { not_started: "未着手", in_progress: "進行中", completed: "完了", on_hold: "保留" };
-const statusClass: Record<WbsItemStatus, string> = { not_started: "bg-slate-100 text-slate-600", in_progress: "bg-indigo-100 text-indigo-700", completed: "bg-emerald-100 text-emerald-700", on_hold: "bg-amber-100 text-amber-700" };
+export const wbsStatusClass: Record<WbsItemStatus, string> = { not_started: "bg-slate-100 text-slate-600", in_progress: "bg-indigo-100 text-indigo-700", completed: "bg-emerald-100 text-emerald-700", on_hold: "bg-amber-100 text-amber-700" };
 
 export function WbsStatus({ status }: { status: WbsItemStatus }) {
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass[status]}`}>{wbsStatusLabel[status]}</span>;
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${wbsStatusClass[status]}`}>{wbsStatusLabel[status]}</span>;
 }
 
 export function WbsProgress({ value, compact = false, className = "" }: { value: number; compact?: boolean; className?: string }) {
