@@ -50,12 +50,10 @@ export function WbsWorkspace({ project, initialItems, dayOffs, role }: { project
     setReordering(true);
     const result = await swapWbsItems(project.id, source.id, target.id);
     if (result.error) alert(result.error);
-    else setItems(current => current.map(item => {
-      const code=item.wbs_code??"", sourceCode=source.wbs_code??"", targetCode=target.wbs_code??"";
-      if(code===sourceCode||code.startsWith(`${sourceCode}.`))return {...item,wbs_code:`${targetCode}${code.slice(sourceCode.length)}`,sort_order:item.id===source.id?target.sort_order:item.sort_order};
-      if(code===targetCode||code.startsWith(`${targetCode}.`))return {...item,wbs_code:`${sourceCode}${code.slice(targetCode.length)}`,sort_order:item.id===target.id?source.sort_order:item.sort_order};
-      return item;
-    }));
+    else setItems(current => {
+      const changed = new Map((result.items ?? []).map(item => [item.id, item]));
+      return current.map(item => changed.get(item.id) ?? item);
+    });
     setReordering(false); router.refresh();
   };
 
