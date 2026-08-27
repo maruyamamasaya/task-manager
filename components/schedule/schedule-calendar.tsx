@@ -6,6 +6,12 @@ import type { DayOff, Meeting, Task, TaskSchedule } from "@/types/database";
 
 const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 const leaveLabels={holiday:"休日",paid_leave:"有休",am_leave:"午前休",pm_leave:"午後休"} as const;
+const startTime = (value: string) => new Intl.DateTimeFormat("ja-JP", {
+  timeZone: "Asia/Tokyo",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+}).format(new Date(value));
 
 export function ScheduleCalendar({view,date,tasks,schedules,meetings,dayOffs}:{view:"month"|"week";date:string;tasks:Task[];schedules:TaskSchedule[];meetings:Meeting[];dayOffs:DayOff[]}) {
   const today=tokyoDateKey(new Date());
@@ -22,7 +28,7 @@ export function ScheduleCalendar({view,date,tasks,schedules,meetings,dayOffs}:{v
     <div className="calendar-grid">{days.map(day=>{const items=grouped.get(day)??[],meetingItems=groupedMeetings.get(day)??[],off=offMap.get(day),national=holidayName(day),weekday=calendarWeekday(day);const outside=view==="month"&&!day.startsWith(date.slice(0,7));return <Link key={day} href={`/schedule?view=day&date=${day}`} aria-current={day===today?"date":undefined} className={[outside?"is-outside":"",weekday===0||national||off?.status==="holiday"||off?.status==="paid_leave"?"is-holiday":"",weekday===6?"is-saturday":"",day===today?"is-today":""].filter(Boolean).join(" ")}>
       <time>{Number(day.slice(-2))}</time>
       {(national||off)&&<small className="day-off-label">{off?leaveLabels[off.status]:national}</small>}
-      {view==="month" ? <span className={items.length+meetingItems.length?"has-items":""}>{items.length+meetingItems.length ? `${items.length+meetingItems.length}件` : "予定なし"}</span> : <div>{(national||off)&&<p className="week-leave">{off?leaveLabels[off.status]:national}{off?.note?` · ${off.note}`:""}</p>}{[...items.map(item=>({id:item.id,start_at:item.start_at,label:titles.get(item.task_id)??"削除されたタスク",meeting:false})),...meetingItems.map(item=>({id:item.id,start_at:item.start_at,label:item.name,meeting:true}))].sort((a,b)=>a.start_at.localeCompare(b.start_at)).map(item=><p className={item.meeting?"week-meeting":undefined} key={`${item.meeting?"meeting":"task"}-${item.id}`}>{item.meeting?"会議 · ":""}{item.label}</p>)}</div>}
+      {view==="month" ? <span className={items.length+meetingItems.length?"has-items":""}>{items.length+meetingItems.length ? `${items.length+meetingItems.length}件` : "予定なし"}</span> : <div>{(national||off)&&<p className="week-leave">{off?leaveLabels[off.status]:national}{off?.note?` · ${off.note}`:""}</p>}<ol className="week-timeline">{[...items.map(item=>({id:item.id,start_at:item.start_at,label:titles.get(item.task_id)??"削除されたタスク",meeting:false})),...meetingItems.map(item=>({id:item.id,start_at:item.start_at,label:item.name,meeting:true}))].sort((a,b)=>a.start_at.localeCompare(b.start_at)).map(item=><li className={item.meeting?"week-meeting":undefined} key={`${item.meeting?"meeting":"task"}-${item.id}`}><time dateTime={item.start_at}>{startTime(item.start_at)}</time><span>{item.label}</span></li>)}</ol></div>}
     </Link>})}</div>
   </section>;
 }
