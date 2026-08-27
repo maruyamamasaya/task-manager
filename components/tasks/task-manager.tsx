@@ -727,6 +727,43 @@ function TaskRow({
                       className="min-h-8 min-w-32 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                     />
                   </label>
+                  <select
+                    value={node.project_id ?? ""}
+                    onChange={(event) => onProjectChange(node, event.target.value || null)}
+                    aria-label={`${node.title}のプロジェクトを変更`}
+                    className="h-8 max-w-48 cursor-pointer truncate rounded-lg border bg-white px-2.5 text-xs font-bold outline-none transition focus:ring-2 focus:ring-indigo-200"
+                    style={{ borderColor: projectColor, color: projectColor, backgroundColor: `${projectColor}14` }}
+                  >
+                    <option value="">未分類</option>
+                    {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                  </select>
+                  <span className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-500">
+                    予定
+                    <strong className="text-indigo-700">{node.estimated_minutes ?? 0}分</strong>
+                  </span>
+                  <label className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-500 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+                    実績
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      list={`actual-presets-${node.id}`}
+                      value={actualMinutes}
+                      onChange={(event) => setActualMinutes(Math.max(0, Number(event.target.value)))}
+                      onBlur={() => {
+                        const next = Math.round(actualMinutes);
+                        setActualMinutes(next);
+                        if (next !== actual) onActualChange(node, next);
+                      }}
+                      onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+                      aria-label={`${node.title}の実績時間（分）`}
+                      className="w-12 bg-transparent text-right text-xs font-bold text-emerald-700 outline-none"
+                    />
+                    <span>分</span>
+                    <datalist id={`actual-presets-${node.id}`}>
+                      {[0, 15, 30, 45, 60, 90, 120].map((minutes) => <option key={minutes} value={minutes} />)}
+                    </datalist>
+                  </label>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   <div
@@ -775,10 +812,9 @@ function TaskRow({
                     {progress}%
                   </span>
                 </div>
-                <PlanActualMeter estimated={node.estimated_minutes ?? 0} actual={actualMinutes} />
               </>
             )}{" "}
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            {isFolder && <div className="mt-2 flex flex-wrap items-center gap-2">
               <select
                 value={node.project_id ?? ""}
                 onChange={(event) => onProjectChange(node, event.target.value || null)}
@@ -789,32 +825,7 @@ function TaskRow({
                 <option value="">未分類</option>
                 {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
               </select>
-              {!isFolder && (
-                <label className="flex items-center gap-1 text-xs font-semibold text-slate-500">
-                  実績
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    list={`actual-presets-${node.id}`}
-                    value={actualMinutes}
-                    onChange={(event) => setActualMinutes(Math.max(0, Number(event.target.value)))}
-                    onBlur={() => {
-                      const next = Math.round(actualMinutes);
-                      setActualMinutes(next);
-                      if (next !== actual) onActualChange(node, next);
-                    }}
-                    onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
-                    aria-label={`${node.title}の実績時間（分）`}
-                    className="h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-right text-xs text-slate-700 outline-none focus:border-indigo-500"
-                  />
-                  <span>分</span>
-                  <datalist id={`actual-presets-${node.id}`}>
-                    {[0, 15, 30, 45, 60, 90, 120].map((minutes) => <option key={minutes} value={minutes} />)}
-                  </datalist>
-                </label>
-              )}
-            </div>
+            </div>}
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-1">
             <button
@@ -1087,29 +1098,6 @@ function TaskDrawer({
   );
 }
 
-function PlanActualMeter({ estimated, actual }: { estimated: number; actual: number }) {
-  const scale = Math.max(estimated, actual, 1);
-  const estimatedWidth = `${(estimated / scale) * 100}%`;
-  const actualWidth = `${(actual / scale) * 100}%`;
-  const exceeded = estimated > 0 && actual > estimated;
-  return (
-    <div className="mt-2 rounded-lg bg-slate-50 px-2.5 py-2" aria-label={`予定${estimated}分、実績${actual}分`}>
-      <div className="grid grid-cols-[2.5rem_1fr_auto] items-center gap-2 text-[11px]">
-        <span className="font-semibold text-slate-500">予定</span>
-        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
-          <div className="h-full rounded-full bg-indigo-400" style={{ width: estimatedWidth }} />
-        </div>
-        <span className="min-w-12 text-right font-bold text-indigo-700">{estimated}分</span>
-        <span className="font-semibold text-slate-500">実績</span>
-        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
-          <div className={`h-full rounded-full ${exceeded ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: actualWidth }} />
-        </div>
-        <span className={`min-w-12 text-right font-bold ${exceeded ? "text-amber-700" : "text-emerald-700"}`}>{actual}分</span>
-      </div>
-      {exceeded && <p className="mt-1 text-right text-[10px] font-semibold text-amber-700">予定を {actual - estimated}分 超過</p>}
-    </div>
-  );
-}
 function Field({
   label,
   children,
