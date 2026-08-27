@@ -1,0 +1,8 @@
+:root { --theme-color: #4f46e5; }
+body { color: #334155; font-family: Inter, "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif; }
+.app-name-link { color: #0f172a !important; font-weight: 700; }
+.markdown-section { max-width: 900px; padding-bottom: 4rem; }
+.markdown-section h1, .markdown-section h2, .markdown-section h3 { color: #0f172a; }
+.markdown-section img { border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 6px 24px rgb(15 23 42 / 8%); }
+.markdown-section blockquote { border-left-color: #6366f1; background: #eef2ff; color: #3730a3; padding: 0.8rem 1rem; }
+.sidebar-nav > ul > li > a { font-weight: 650; }
