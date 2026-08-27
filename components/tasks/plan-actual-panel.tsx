@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   actualRate,
   scheduleMinutes,
@@ -10,8 +9,6 @@ import {
 } from "@/lib/time/phase3";
 import type { Task, TaskSchedule, WorkLog } from "@/types/database";
 
-const button =
-  "rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50";
 export function PlanActualPanel({
   task,
   schedules,
@@ -29,7 +26,6 @@ export function PlanActualPanel({
   correctedActual: number | null;
   onCorrectedActualChange: (minutes: number | null) => void;
 }) {
-  const [custom, setCustom] = useState(25);
   const existingActual = totalWorkMinutes(logs);
   const stagedActual = actualMinutes.reduce((sum, minutes) => sum + minutes, 0);
   const actual = (correctedActual ?? existingActual) + stagedActual;
@@ -43,12 +39,6 @@ export function PlanActualPanel({
     0,
   );
 
-  const addActual = (minutes: number) => {
-    if (Number.isInteger(minutes) && minutes > 0) {
-      onCorrectedActualChange(null);
-      onActualMinutesChange([...actualMinutes, minutes]);
-    }
-  };
   return (
     <section className="mt-6 border-t pt-5">
       <h3 className="font-bold">予定・実績</h3>
@@ -62,27 +52,15 @@ export function PlanActualPanel({
       </p>
 
       <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-        <label className="text-sm font-semibold" htmlFor="correct-actual">現在の実績を修正</label>
-        <p className="mt-1 text-xs text-slate-500">追加ではなく、保存後の実績合計を直接指定します。</p>
+        <label className="text-sm font-semibold" htmlFor="correct-actual">実績（分）</label>
+        <p className="mt-1 text-xs text-slate-500">保存後の実績合計を数値で入力します。</p>
         <div className="mt-2 flex items-center gap-2">
-          <input id="correct-actual" aria-label="修正後の実績（分）" type="number" min="0" step="1" value={correctedActual ?? existingActual} onChange={(event) => { onActualMinutesChange([]); onCorrectedActualChange(Number(event.target.value)); }} className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
+          <input id="correct-actual" aria-label="修正後の実績（分）" type="number" inputMode="numeric" min="0" step="1" value={correctedActual ?? existingActual} onChange={(event) => { onActualMinutesChange([]); onCorrectedActualChange(Math.max(0, Number(event.target.value))); }} className="number-input-no-spin w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
           <span className="text-sm text-slate-500">分</span>
           {correctedActual !== null && <button type="button" className="px-2 text-sm text-slate-500" onClick={() => onCorrectedActualChange(null)}>元に戻す</button>}
         </div>
       </div>
 
-      <div className="mt-4">
-        <p className="text-sm font-semibold">実績を追加</p>
-        <p className="mt-1 text-xs text-slate-500">追加内容は「保存」を押すまで反映されません。</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {[15, 30, 60].map((minutes) => (
-            <button type="button" className={button} key={minutes} onClick={() => addActual(minutes)}>+{minutes}分</button>
-          ))}
-          <input aria-label="任意の分数" type="number" min="1" value={custom} onChange={(event) => setCustom(Number(event.target.value))} className="w-20 rounded-lg border px-2 text-sm" />
-          <button type="button" className={button} onClick={() => addActual(custom)}>追加</button>
-          {actualMinutes.length > 0 && <button type="button" className="px-2 text-sm text-slate-500" onClick={() => onActualMinutesChange([])}>取り消す</button>}
-        </div>
-      </div>
     </section>
   );
 }

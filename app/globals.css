@@ -144,6 +144,9 @@ button:disabled { cursor: not-allowed; }
 @media(max-width:700px){.holiday-settings{grid-template-columns:1fr}.holiday-list article{grid-template-columns:1fr auto}.holiday-list article p{grid-column:1/-1}.day-leave-banner a{display:none}}
 
 /* Modern productivity surfaces */
+.number-input-no-spin { appearance:textfield; -moz-appearance:textfield; }
+.number-input-no-spin::-webkit-inner-spin-button,
+.number-input-no-spin::-webkit-outer-spin-button { margin:0; -webkit-appearance:none; }
 .schedule-calendar,.schedule-workspace,.holiday-form,.holiday-list { border-color:rgb(226 232 240 / .8); border-radius:12px; box-shadow:none; }
 .schedule-workspace { grid-template-columns:280px minmax(0,1fr); }
 .task-palette { padding:20px 16px; background:#fff; }

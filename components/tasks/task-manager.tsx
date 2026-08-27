@@ -30,6 +30,7 @@ import { ProgressReflectionPanel } from "./progress-reflection-panel";
 import { DatabaseUpdating } from "@/components/ui/database-updating";
 import { addWorkLog, correctActualMinutes } from "@/app/(app)/phase3-actions";
 import { Pagination } from "@/components/ui/pagination";
+import { Icon } from "@/components/ui/icon";
 
 const TASKS_PER_PAGE = 40;
 const FILTER_STORAGE_KEY = "taskflow:tasks-view";
@@ -484,6 +485,11 @@ export function TaskManager({
                 onActualChange={(node, minutes) =>
                   run(() => correctActualMinutes(node.id, minutes))
                 }
+                onEstimateChange={(node, minutes) =>
+                  run(() => updateTask(node.id, { ...node, estimated_minutes: minutes }), current =>
+                    current.map(task => task.id === node.id ? { ...task, estimated_minutes: minutes } : task),
+                  )
+                }
                 onProgressChange={(node, progress) =>
                   run(() => saveProgress(node.id, progress, ""), current =>
                       current.map((task) =>
@@ -588,6 +594,7 @@ function TaskRow({
   onPriorityChange,
   onProjectChange,
   onActualChange,
+  onEstimateChange,
   onProgressChange,
   draggedTaskId,
   dropTarget,
@@ -611,6 +618,7 @@ function TaskRow({
   onPriorityChange: (t: TaskNode, priority: Task["priority"]) => void;
   onProjectChange: (t: TaskNode, projectId: string | null) => void;
   onActualChange: (t: TaskNode, minutes: number) => void;
+  onEstimateChange: (t: TaskNode, minutes: number) => void;
   onProgressChange: (t: TaskNode, progress: number) => void;
   draggedTaskId: string | null;
   dropTarget: { id: string; edge: "before" | "after" } | null;
@@ -623,8 +631,10 @@ function TaskRow({
 }) {
   const [progress, setProgress] = useState(node.progress);
   const [actualMinutes, setActualMinutes] = useState(actual);
+  const [estimatedMinutes, setEstimatedMinutes] = useState(node.estimated_minutes ?? 0);
   useEffect(() => setProgress(node.progress), [node.progress]);
   useEffect(() => setActualMinutes(actual), [actual]);
+  useEffect(() => setEstimatedMinutes(node.estimated_minutes ?? 0), [node.estimated_minutes]);
   const isFolder = folderTaskIds.has(node.id);
   const isScheduled = scheduledTaskIds.has(node.id);
   const statusClass = {
@@ -689,6 +699,22 @@ function TaskRow({
             ) : (
               <>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <label
+                    className="flex h-8 max-w-52 items-center gap-1.5 rounded-lg border bg-white px-2.5 font-bold"
+                    style={{ borderColor: projectColor, color: projectColor, backgroundColor: `${projectColor}14` }}
+                  >
+                    <Icon name="projects" className="size-3.5 shrink-0" />
+                    <span className="sr-only">プロジェクト</span>
+                    <select
+                      value={node.project_id ?? ""}
+                      onChange={(event) => onProjectChange(node, event.target.value || null)}
+                      aria-label={`${node.title}のプロジェクトを変更`}
+                      className="min-w-0 max-w-40 cursor-pointer truncate bg-transparent font-bold outline-none"
+                    >
+                      <option value="">未分類</option>
+                      {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                    </select>
+                  </label>
                   <select
                     value={node.status}
                     onChange={(event) => onStatusChange(node, event.target.value as TaskStatus)}
@@ -727,27 +753,33 @@ function TaskRow({
                       className="min-h-8 min-w-32 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                     />
                   </label>
-                  <select
-                    value={node.project_id ?? ""}
-                    onChange={(event) => onProjectChange(node, event.target.value || null)}
-                    aria-label={`${node.title}のプロジェクトを変更`}
-                    className="h-8 max-w-48 cursor-pointer truncate rounded-lg border bg-white px-2.5 text-xs font-bold outline-none transition focus:ring-2 focus:ring-indigo-200"
-                    style={{ borderColor: projectColor, color: projectColor, backgroundColor: `${projectColor}14` }}
-                  >
-                    <option value="">未分類</option>
-                    {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-                  </select>
-                  <span className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-500">
+                  <label className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-500 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
                     予定
-                    <strong className="text-indigo-700">{node.estimated_minutes ?? 0}分</strong>
-                  </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputMode="numeric"
+                      value={estimatedMinutes}
+                      onChange={(event) => setEstimatedMinutes(Math.max(0, Number(event.target.value)))}
+                      onBlur={() => {
+                        const next = Math.round(estimatedMinutes);
+                        setEstimatedMinutes(next);
+                        if (next !== (node.estimated_minutes ?? 0)) onEstimateChange(node, next);
+                      }}
+                      onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+                      aria-label={`${node.title}の予定時間（分）`}
+                      className="number-input-no-spin w-12 bg-transparent text-right text-xs font-bold text-indigo-700 outline-none"
+                    />
+                    <span>分</span>
+                  </label>
                   <label className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-500 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
                     実績
                     <input
                       type="number"
                       min="0"
                       step="1"
-                      list={`actual-presets-${node.id}`}
+                      inputMode="numeric"
                       value={actualMinutes}
                       onChange={(event) => setActualMinutes(Math.max(0, Number(event.target.value)))}
                       onBlur={() => {
@@ -757,15 +789,13 @@ function TaskRow({
                       }}
                       onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
                       aria-label={`${node.title}の実績時間（分）`}
-                      className="w-12 bg-transparent text-right text-xs font-bold text-emerald-700 outline-none"
+                      className="number-input-no-spin w-12 bg-transparent text-right text-xs font-bold text-emerald-700 outline-none"
                     />
                     <span>分</span>
-                    <datalist id={`actual-presets-${node.id}`}>
-                      {[0, 15, 30, 45, 60, 90, 120].map((minutes) => <option key={minutes} value={minutes} />)}
-                    </datalist>
                   </label>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
+                  <span className="shrink-0 text-xs font-semibold text-slate-500">進捗</span>
                   <div
                     data-progress-control
                     className="relative h-5 flex-1 cursor-pointer touch-none rounded-full bg-transparent py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
@@ -815,16 +845,22 @@ function TaskRow({
               </>
             )}{" "}
             {isFolder && <div className="mt-2 flex flex-wrap items-center gap-2">
-              <select
-                value={node.project_id ?? ""}
-                onChange={(event) => onProjectChange(node, event.target.value || null)}
-                aria-label={`${node.title}のプロジェクトを変更`}
-                className="max-w-48 cursor-pointer truncate rounded-full border px-2.5 py-1 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-200"
+              <label
+                className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold"
                 style={{ borderColor: projectColor, color: projectColor, backgroundColor: `${projectColor}14` }}
               >
-                <option value="">未分類</option>
-                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-              </select>
+                <Icon name="projects" className="size-3.5 shrink-0" />
+                <span className="sr-only">プロジェクト</span>
+                <select
+                  value={node.project_id ?? ""}
+                  onChange={(event) => onProjectChange(node, event.target.value || null)}
+                  aria-label={`${node.title}のプロジェクトを変更`}
+                  className="max-w-44 cursor-pointer truncate bg-transparent font-bold outline-none"
+                >
+                  <option value="">未分類</option>
+                  {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                </select>
+              </label>
             </div>}
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-1">
@@ -873,6 +909,7 @@ function TaskRow({
           onPriorityChange={onPriorityChange}
           onProjectChange={onProjectChange}
           onActualChange={onActualChange}
+          onEstimateChange={onEstimateChange}
           onProgressChange={onProgressChange}
           draggedTaskId={draggedTaskId}
           dropTarget={dropTarget}
