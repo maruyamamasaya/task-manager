@@ -49,7 +49,7 @@ export async function createTask(input: TaskInput) {
     }
   }
   const state = normalizeState(input.status ?? "todo", input.progress ?? 0);
-  const { error } = await db
+  const { data, error } = await db
     .from("tasks")
     .insert({
       ...input,
@@ -60,10 +60,12 @@ export async function createTask(input: TaskInput) {
       estimated_minutes: input.estimated_minutes ?? null,
       user_id: user.id,
       ...state,
-    });
+    })
+    .select("*")
+    .single();
   if (error) return { error: error.message };
   refresh();
-  return { ok: true };
+  return { ok: true, task: data };
 }
 export async function createTasks(inputs: TaskInput[]) {
   const tasks = inputs
@@ -80,10 +82,10 @@ export async function createTasks(inputs: TaskInput[]) {
     user_id: user.id,
     ...normalizeState(input.status ?? "todo", input.progress ?? 0),
   }));
-  const { error } = await db.from("tasks").insert(rows);
+  const { data, error } = await db.from("tasks").insert(rows).select("*");
   if (error) return { error: error.message };
   refresh();
-  return { ok: true, count: rows.length };
+  return { ok: true, count: rows.length, tasks: data ?? [] };
 }
 export async function updateTask(id: string, input: TaskInput) {
   const { db } = await context();
