@@ -10,6 +10,6 @@
     "types": ["node"],
     "plugins": []
   },
-  "include": ["lib/tasks/**/*.ts", "lib/time/**/*.ts", "lib/analytics/**/*.ts", "lib/supabase/session-cookie.ts", "types/database.ts", "tests/**/*.ts"],
+  "include": ["lib/tasks/**/*.ts", "lib/time/**/*.ts", "lib/analytics/**/*.ts", "lib/wbs/**/*.ts", "lib/supabase/session-cookie.ts", "types/database.ts", "tests/**/*.ts"],
   "exclude": ["node_modules"]
 }
