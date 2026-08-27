@@ -28,3 +28,25 @@ export function scheduleMarkdown(date: string, schedules: {start_at:string;end_a
   const blocks = [...schedules].sort((a,b)=>a.start_at.localeCompare(b.start_at)).map(item => `${formatTokyo(item.start_at,{hour:"2-digit",minute:"2-digit",hourCycle:"h23"})} - ${formatTokyo(item.end_at,{hour:"2-digit",minute:"2-digit",hourCycle:"h23"})}\n${titles.get(item.task_id) ?? "削除されたタスク"}`);
   return `## ${date.replaceAll("-", "/")} スケジュール\n\n${blocks.join("\n\n")}`.trimEnd();
 }
+
+type ReportTask = { id: string; title: string; due_at: string | null };
+type ReportSchedule = { task_id: string; start_at: string; end_at: string };
+
+export function taskStatusMarkdown(overdue: ReportTask[], done: ReportTask[], schedules: ReportSchedule[]) {
+  const scheduleMap = schedules.reduce((map, schedule) => {
+    map.set(schedule.task_id, [...(map.get(schedule.task_id) ?? []), schedule]);
+    return map;
+  }, new Map<string, ReportSchedule[]>());
+  const section = (title: string, tasks: ReportTask[]) => {
+    const rows = tasks.map(task => {
+      const due = task.due_at ? formatTokyo(task.due_at, { year: "numeric", month: "numeric", day: "numeric" }) : "期限なし";
+      const planned = (scheduleMap.get(task.id) ?? [])
+        .sort((a, b) => a.start_at.localeCompare(b.start_at))
+        .map(item => `${formatTokyo(item.start_at, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })} - ${formatTokyo(item.end_at, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}`)
+        .join("、");
+      return `- ${task.title}（期限: ${due}${planned ? ` / 予定: ${planned}` : ""}）`;
+    });
+    return `## ${title}\n\n${rows.length ? rows.join("\n") : "なし"}`;
+  };
+  return `${section("期限切れ", overdue)}\n\n${section("完了", done)}`;
+}
