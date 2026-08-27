@@ -84,10 +84,10 @@ export async function saveWbsItem(projectId:string,itemId:string|null,parentId:s
  const oldCode=current?.wbs_code??null; const descendants=oldCode?items.filter(item=>item.id!==itemId&&item.wbs_code?.startsWith(`${oldCode}.`)):[];
  const changes=new Map<string,string>([[itemId??"__new",code],...descendants.map(item=>[item.id,`${code}${item.wbs_code!.slice(oldCode!.length)}`] as [string,string])]);
  const unaffected=new Set(items.filter(item=>!changes.has(item.id)).map(item=>item.wbs_code));
- if(new Set(changes.values()).size!==changes.size||[...changes.values()].some(value=>unaffected.has(value)))return {error:"そのWBS番号はすでに使用されています。変更は保存されませんでした。"};
+ if(new Set(changes.values()).size!==changes.size||[...changes.values()].some(value=>unaffected.has(value)))return {error:"そのWBS番号はすでに使用されています。変更は保存されませんでした。",field:"wbs_code" as const};
  const status=String(form.get("status")??"not_started"),progress=status==="completed"?100:Number(form.get("progress")??0); const segment=Number(code.split(".").at(-1));
  const values={project_id:projectId,parent_id:nextParentId,wbs_code:code,sort_order:segment,name:String(form.get("name")??"").trim(),description:String(form.get("description")??"")||null,start_date:String(form.get("start_date")??"")||null,end_date:String(form.get("end_date")??"")||null,owner_name:String(form.get("owner_name")??"")||null,status,progress,estimate_hours:String(form.get("estimate_hours")??"")===""?null:Number(form.get("estimate_hours")),actual_hours:String(form.get("actual_hours")??"")===""?null:Number(form.get("actual_hours")),note:String(form.get("note")??"")||null,created_by:user.id};
- const result=itemId?await db.from("wbs_items").update(values).eq("id",itemId):await db.from("wbs_items").insert(values); if(result.error)return {error:result.error.code==="23505"?"そのWBS番号はすでに使用されています。変更は保存されませんでした。":"項目を保存できませんでした。入力内容と権限を確認してください。"};
+ const result=itemId?await db.from("wbs_items").update(values).eq("id",itemId):await db.from("wbs_items").insert(values); if(result.error)return result.error.code==="23505"?{error:"そのWBS番号はすでに使用されています。変更は保存されませんでした。",field:"wbs_code" as const}:{error:"項目を保存できませんでした。入力内容と権限を確認してください。"};
  for(const descendant of descendants){const newCode=changes.get(descendant.id)!;const {error}=await db.from("wbs_items").update({wbs_code:newCode,sort_order:Number(newCode.split(".").at(-1))}).eq("id",descendant.id);if(error)return {error:"子項目のWBS番号を更新できませんでした。"}}
  revalidatePath(`/wbs/${projectId}`);revalidatePath("/wbs");return {ok:true};
 }
