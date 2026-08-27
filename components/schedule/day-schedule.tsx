@@ -2,7 +2,7 @@
 
 import { CSSProperties, DragEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createMeeting, deleteMeeting, deleteSchedule, saveSchedule } from "@/app/(app)/phase3-actions";
+import { createMeeting, deleteMeeting, deleteSchedule, saveSchedule, updateMeeting } from "@/app/(app)/phase3-actions";
 import { dailyTotals, formatTokyo, overlaps, scheduleMarkdown, scheduleMinutes, tokyoDateTime, varianceLabel } from "@/lib/time/phase3";
 import { holidayName } from "@/lib/time/japanese-holidays";
 import type { DayOff, Meeting, Project, Task, TaskSchedule, WorkLog } from "@/types/database";
@@ -15,8 +15,24 @@ const MINUTES_PER_STEP = 15;
 const UNCLASSIFIED_COLOR = "#94a3b8";
 const statusLabel = { todo: "未着手", doing: "進行中", done: "完了済み" } as const;
 
-type DraggingTask = { taskId: string; scheduleId?: string; duration: number; title: string };
+type DraggingTask = { taskId?: string; scheduleId?: string; meetingId?: string; duration: number; title: string };
 type DropPreview = DraggingTask & { offset: number };
+type PositionedItem = { id:string; start_at:string; end_at:string; lane:number; lanes:number };
+
+export function positionOverlaps(items: {id:string;start_at:string;end_at:string}[]): PositionedItem[] {
+  const sorted=[...items].sort((a,b)=>a.start_at.localeCompare(b.start_at)||a.end_at.localeCompare(b.end_at));
+  const result:PositionedItem[]=[];
+  for(let index=0;index<sorted.length;){
+    let end=sorted[index].end_at, next=index+1;
+    while(next<sorted.length&&sorted[next].start_at<end){if(sorted[next].end_at>end)end=sorted[next].end_at;next++;}
+    const laneEnds:string[]=[];
+    const group=sorted.slice(index,next).map(item=>{let lane=laneEnds.findIndex(value=>value<=item.start_at);if(lane<0)lane=laneEnds.length;laneEnds[lane]=item.end_at;return {...item,lane,lanes:0};});
+    const lanes=laneEnds.length;
+    result.push(...group.map(item=>({...item,lanes})));
+    index=next;
+  }
+  return result;
+}
 
 function timeValue(date: Date) {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
@@ -49,6 +65,10 @@ export function DaySchedule({ date, tasks, projects, schedules, meetings, logs, 
   const [meetingName, setMeetingName] = useState("");
   const [meetingStart, setMeetingStart] = useState("10:00");
   const [meetingDuration, setMeetingDuration] = useState(30);
+  const [editingMeeting, setEditingMeeting] = useState<Meeting>();
+  const [editMeetingName, setEditMeetingName] = useState("");
+  const [editMeetingStart, setEditMeetingStart] = useState("10:00");
+  const [editMeetingDuration, setEditMeetingDuration] = useState(30);
   const [dragOver, setDragOver] = useState(false);
   const [dragging, setDragging] = useState<DraggingTask>();
   const [dropPreview, setDropPreview] = useState<DropPreview>();
@@ -57,6 +77,8 @@ export function DaySchedule({ date, tasks, projects, schedules, meetings, logs, 
   const totals = dailyTotals(schedules, logs);
   const taskMap = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
   const projectColorMap = useMemo(() => new Map(projects.map((project) => [project.id, project.color ?? UNCLASSIFIED_COLOR])), [projects]);
+  const positions = useMemo(() => new Map(positionOverlaps([...schedules,...meetings]).map(item=>[item.id,item])), [schedules,meetings]);
+  const excessiveOverlap = [...positions.values()].some(item=>item.lanes>2);
   const taskColor = (task?: Task) => task?.project_id ? projectColorMap.get(task.project_id) ?? UNCLASSIFIED_COLOR : UNCLASSIFIED_COLOR;
   const visibleTasks = useMemo(() => tasks.filter((task) => task.status !== "done" && (projectId === "all" || (projectId === "unclassified" ? !task.project_id : task.project_id === projectId))), [tasks, projectId]);
   const copySchedule = async () => { await navigator.clipboard.writeText(scheduleMarkdown(date,schedules,new Map(tasks.map(t=>[t.id,t.title])))); setMessage("Markdown形式のスケジュールをコピーしました"); };
@@ -81,6 +103,8 @@ export function DaySchedule({ date, tasks, projects, schedules, meetings, logs, 
     setMessage(result.error ?? "会議を作成しました");
     if (!result.error) { setMeetingName(""); router.refresh(); }
   });
+  const openMeetingEditor=(meeting:Meeting)=>{setEditingMeeting(meeting);setEditMeetingName(meeting.name);setEditMeetingStart(timeValue(new Date(meeting.start_at)));setEditMeetingDuration(scheduleMinutes(meeting));};
+  const saveMeetingEdit=()=>{if(!editingMeeting)return;go(async()=>{const result=await updateMeeting({id:editingMeeting.id,name:editMeetingName,startAt:tokyoDateTime(date,editMeetingStart),duration:editMeetingDuration});setMessage(result.error??"会議を更新しました");if(!result.error){setEditingMeeting(undefined);router.refresh();}});};
 
   const selectTask = (task: Task) => {
     if (!task.estimated_minutes) {
@@ -97,7 +121,7 @@ export function DaySchedule({ date, tasks, projects, schedules, meetings, logs, 
     const offset = Math.max(0, Math.min((END_HOUR - START_HOUR) * 60 - dragging.duration, Math.round(rawMinutes / MINUTES_PER_STEP) * MINUTES_PER_STEP));
     setDragOver(true);
     setDropPreview({ ...dragging, offset });
-    event.dataTransfer.dropEffect = dragging.scheduleId ? "move" : "copy";
+    event.dataTransfer.dropEffect = dragging.scheduleId||dragging.meetingId ? "move" : "copy";
   };
   const finishDragging = () => {
     setDragging(undefined);
@@ -110,7 +134,9 @@ export function DaySchedule({ date, tasks, projects, schedules, meetings, logs, 
     const rect = event.currentTarget.getBoundingClientRect();
     const rawMinutes = ((event.clientY - rect.top) / HOUR_HEIGHT) * 60;
     const offset = Math.max(0, Math.min((END_HOUR - START_HOUR) * 60 - dragging.duration, Math.round(rawMinutes / MINUTES_PER_STEP) * MINUTES_PER_STEP));
-    act(saveSchedule({ id: dragging.scheduleId, taskId: dragging.taskId, startAt: tokyoDateTime(date, valueFromMinutes(offset)), endAt: tokyoDateTime(date, valueFromMinutes(offset + dragging.duration)) }));
+    const startAt=tokyoDateTime(date,valueFromMinutes(offset));
+    if(dragging.meetingId) act(updateMeeting({id:dragging.meetingId,name:dragging.title,startAt,duration:dragging.duration}));
+    else if(dragging.taskId) act(saveSchedule({ id: dragging.scheduleId, taskId: dragging.taskId, startAt, endAt: tokyoDateTime(date, valueFromMinutes(offset + dragging.duration)) }));
     finishDragging();
   };
 
@@ -142,7 +168,8 @@ export function DaySchedule({ date, tasks, projects, schedules, meetings, logs, 
       <div className="meeting-creator">
         <div className="schedule-section-heading"><div><span className="eyebrow">MEETING</span><h2>会議の新規作成</h2></div></div>
         <label>会議名<input value={meetingName} onChange={(event)=>setMeetingName(event.target.value)} placeholder="例：週次ミーティング" disabled={isPast}/></label>
-        <div className="meeting-fields"><label>開始時間<input type="time" step="900" value={meetingStart} onChange={(event)=>setMeetingStart(event.target.value)} disabled={isPast}/></label><label>時間（分）<input type="number" min="1" step="1" list="meeting-duration-options" value={meetingDuration} onChange={(event)=>setMeetingDuration(Number(event.target.value))} disabled={isPast}/><datalist id="meeting-duration-options">{[30,45,60,90,120,150,180].map(value=><option key={value} value={value}/>)}</datalist></label></div>
+        <div className="meeting-fields"><label>開始時間<input type="time" step="900" value={meetingStart} onChange={(event)=>setMeetingStart(event.target.value)} disabled={isPast}/></label><label>時間（分）<input type="number" inputMode="numeric" min="1" step="1" value={meetingDuration} onChange={(event)=>setMeetingDuration(event.target.valueAsNumber||0)} disabled={isPast}/></label></div>
+        <label>30分単位から選択<select value={meetingDuration%30===0?meetingDuration:""} onChange={(event)=>setMeetingDuration(Number(event.target.value))} disabled={isPast}><option value="">時間を選択</option>{[30,60,90,120,150,180,210,240].map(value=><option key={value} value={value}>{value}分</option>)}</select></label>
         <button type="button" onClick={addMeeting} disabled={pending||isPast||!meetingName.trim()}>会議ブロックを作成</button>
         {isPast&&<small>過去のスケジュールは固定されています。</small>}
       </div>
@@ -154,6 +181,7 @@ export function DaySchedule({ date, tasks, projects, schedules, meetings, logs, 
         <div className="schedule-totals"><span>予定 <b>{totals.planned}分</b></span><span>実績 <b>{totals.actual}分</b></span><span>差分 <b>{varianceLabel(totals.difference)}</b></span><button onClick={copySchedule}>Markdownをコピー</button></div>
       </div>
       <div className="timeline-legend"><span><i className="legend-dot" />15分単位・ドラッグ中に開始時刻を表示</span><span>Shift＋クリック／右クリックで詳細 · ドラッグで移動</span></div>
+      {excessiveOverlap&&<div className="timeline-overlap-warning" role="alert"><b>3件以上の予定が重複しています。</b> タスクまたは会議を移動するか、不要な予定を削除してください。</div>}
       <div className="timeline-scroll-area">
         <div
           className={`day-timeline ${dragOver ? "is-drag-over" : ""}`}
@@ -171,7 +199,8 @@ export function DaySchedule({ date, tasks, projects, schedules, meetings, logs, 
             const duration = scheduleMinutes(schedule);
             const endValue = valueFromMinutes(minutesFromStart(startValue) + duration);
             const height = Math.max(32, duration / 60 * HOUR_HEIGHT);
-            const conflict = schedules.some((other) => other.id !== schedule.id && overlaps(schedule, other));
+            const conflict = [...schedules,...meetings].some((other) => other.id !== schedule.id && overlaps(schedule, other));
+            const position=positions.get(schedule.id);
             return <button
               key={schedule.id}
               draggable={!isPast}
@@ -181,7 +210,7 @@ export function DaySchedule({ date, tasks, projects, schedules, meetings, logs, 
               onContextMenu={(event) => { event.preventDefault(); openTaskDetails(schedule.task_id); }}
               title="Shift＋クリックまたは右クリックでタスク詳細を開く"
               className={`timeline-task ${conflict ? "has-conflict" : ""}`}
-              style={{ top, height, "--task": taskColor(task), "--task-bg": `color-mix(in srgb, ${taskColor(task)} 10%, white)` } as CSSProperties}
+              style={{ top, height, "--lane":Math.min(position?.lane??0,1), "--lanes":Math.min(position?.lanes??1,2), "--task": taskColor(task), "--task-bg": `color-mix(in srgb, ${taskColor(task)} 10%, white)` } as CSSProperties}
             >
               <span className="timeline-task-time">{startValue}–{endValue}</span>
               <span className={`timeline-task-status is-${task?.status ?? "todo"}`}>{statusLabel[task?.status ?? "todo"]} · {task?.progress ?? 0}%</span>
@@ -196,7 +225,8 @@ export function DaySchedule({ date, tasks, projects, schedules, meetings, logs, 
             const top=minutesFromStart(startValue)/60*HOUR_HEIGHT;
             const height=Math.max(32,duration/60*HOUR_HEIGHT);
             const conflict=[...schedules,...meetings].some(other=>other.id!==meeting.id&&overlaps(meeting,other));
-            return <article key={meeting.id} className={`timeline-task timeline-meeting ${conflict?"has-conflict":""}`} style={{top,height}}><span className="timeline-task-time">{startValue}–{valueFromMinutes(minutesFromStart(startValue)+duration)}</span><span className="timeline-task-status">会議</span><strong>{meeting.name}</strong><small>{duration}分{conflict?" · 予定が重複しています":""}</small>{!isPast&&<button className="timeline-delete" aria-label="会議を削除" onClick={()=>act(deleteMeeting(meeting.id))}>×</button>}</article>;
+            const position=positions.get(meeting.id);
+            return <article key={meeting.id} draggable={!isPast} onDragStart={(event)=>{event.dataTransfer.effectAllowed="move";setDragging({meetingId:meeting.id,duration,title:meeting.name});}} onDragEnd={finishDragging} onClick={(event)=>{if(event.shiftKey)openMeetingEditor(meeting);}} onContextMenu={(event)=>{event.preventDefault();openMeetingEditor(meeting);}} title="ドラッグで移動、Shift＋クリック／右クリックで時間を編集" className={`timeline-task timeline-meeting ${conflict?"has-conflict":""}`} style={{top,height,"--lane":Math.min(position?.lane??0,1),"--lanes":Math.min(position?.lanes??1,2)} as CSSProperties}><span className="timeline-task-time">{startValue}–{valueFromMinutes(minutesFromStart(startValue)+duration)}</span><span className="timeline-task-status">会議</span><strong>{meeting.name}</strong><small>{duration}分{conflict?" · 予定が重複しています":""}</small>{!isPast&&<button className="timeline-delete" aria-label="会議を削除" onClick={(event)=>{event.stopPropagation();act(deleteMeeting(meeting.id));}}>×</button>}</article>;
           })}
           {showNow && <div className="timeline-now" style={{ top: nowOffset / 60 * HOUR_HEIGHT }} aria-label={`現在時刻 ${nowValue}`}><time>{nowValue}</time><span /></div>}
           {dropPreview && <div
@@ -212,5 +242,5 @@ export function DaySchedule({ date, tasks, projects, schedules, meetings, logs, 
         </div>
       </div>
     </section>
-  </div>{message&&<div className="schedule-toast" role="status"><span aria-hidden="true">✓</span><p>{message}</p><button type="button" aria-label="通知を閉じる" onClick={()=>setMessage("")}>×</button></div>}{errorMessage&&<div className="schedule-error-backdrop" role="presentation" onClick={()=>setErrorMessage("")}><div className="schedule-error-dialog" role="alertdialog" aria-modal="true" aria-labelledby="schedule-error-title" onClick={(event)=>event.stopPropagation()}><span aria-hidden="true">!</span><h2 id="schedule-error-title">予定時間が必要です</h2><p>{errorMessage}</p><button autoFocus onClick={()=>setErrorMessage("")}>閉じる</button></div></div>}</>;
+  </div>{editingMeeting&&<div className="schedule-modal-backdrop" onClick={()=>setEditingMeeting(undefined)}><form className="meeting-edit-dialog" onSubmit={(event)=>{event.preventDefault();saveMeetingEdit();}} onClick={(event)=>event.stopPropagation()}><span className="meeting-tag">会議</span><h2>会議を編集</h2><label>会議名<input autoFocus value={editMeetingName} onChange={(event)=>setEditMeetingName(event.target.value)}/></label><div className="meeting-fields"><label>開始時間<input type="time" step="900" value={editMeetingStart} onChange={(event)=>setEditMeetingStart(event.target.value)}/></label><label>時間（分）<input type="number" inputMode="numeric" min="1" step="1" value={editMeetingDuration} onChange={(event)=>setEditMeetingDuration(event.target.valueAsNumber||0)}/></label></div><label>30分単位から選択<select value={editMeetingDuration%30===0?editMeetingDuration:""} onChange={(event)=>setEditMeetingDuration(Number(event.target.value))}><option value="">時間を選択</option>{[30,60,90,120,150,180,210,240].map(value=><option key={value} value={value}>{value}分</option>)}</select></label><div className="meeting-edit-actions"><button type="button" onClick={()=>setEditingMeeting(undefined)}>キャンセル</button><button type="submit" disabled={pending||!editMeetingName.trim()||editMeetingDuration<1}>変更を保存</button></div></form></div>}{message&&<div className="schedule-toast" role="status"><span aria-hidden="true">✓</span><p>{message}</p><button type="button" aria-label="通知を閉じる" onClick={()=>setMessage("")}>×</button></div>}{errorMessage&&<div className="schedule-error-backdrop" role="presentation" onClick={()=>setErrorMessage("")}><div className="schedule-error-dialog" role="alertdialog" aria-modal="true" aria-labelledby="schedule-error-title" onClick={(event)=>event.stopPropagation()}><span aria-hidden="true">!</span><h2 id="schedule-error-title">予定時間が必要です</h2><p>{errorMessage}</p><button autoFocus onClick={()=>setErrorMessage("")}>閉じる</button></div></div>}</>;
 }
