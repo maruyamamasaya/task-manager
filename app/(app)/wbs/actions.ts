@@ -74,6 +74,7 @@ export async function createWbsProject(form:FormData){
   redirect(`/wbs/${projectId}`);
 }
 export async function joinWbsProject(_:unknown,form:FormData){const {db}=await context();const {data,error}=await db.rpc("join_wbs_project",{p_share_code:String(form.get("shareCode")??"").trim().toUpperCase()});if(error)return {error:message(error.message)};revalidatePath("/wbs");return {ok:data==="pending"?"参加申請を送信しました。プロジェクト所有者の承認をお待ちください。":"プロジェクトに参加しました。"}}
+export async function updateWbsProjectName(projectId:string,name:string){const {db}=await context();const value=name.trim();if(!value||value.length>200)return {error:"タイトルは1〜200文字で入力してください。"};const {error}=await db.from("wbs_projects").update({name:value}).eq("id",projectId);if(error)return {error:"タイトルを変更できませんでした。所有者権限を確認してください。"};revalidatePath("/wbs");revalidatePath(`/wbs/${projectId}`);return {ok:true}}
 export async function saveWbsItem(projectId:string,itemId:string|null,parentId:string|null,form:FormData){
  const {db,user}=await context(); const {data}=await db.from("wbs_items").select("*").eq("project_id",projectId); const items=(data??[]) as WbsItem[];
  const current=itemId?items.find(item=>item.id===itemId):null; const requested=normalizeWbsCode(String(form.get("wbs_code")??"")); const code=requested||nextWbsCode(items,parentId);
