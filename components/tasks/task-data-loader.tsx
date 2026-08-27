@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { readCache, writeCache, type CacheEnvelope } from "@/lib/cache/indexed-db";
 import type { Project, Reflection, Task, TaskSchedule, WorkLog } from "@/types/database";
@@ -18,6 +18,10 @@ function mergeUpdated<T extends { id: string }>(current: T[], changed: T[]) {
 
 export function TaskDataLoader({ initialTaskId }: { initialTaskId?: string }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const snapshotRef = useRef<Snapshot | null>(null);
+  const cacheKey = useRef<string | null>(null);
+  const envelope = useRef<CacheEnvelope<Snapshot> | null>(null);
+  const localRevision = useRef(0);
   const [syncing, setSyncing] = useState(true);
   const [error, setError] = useState("");
 
@@ -28,8 +32,15 @@ export function TaskDataLoader({ initialTaskId }: { initialTaskId?: string }) {
       const { data: { session } } = await db.auth.getSession();
       if (!session || !active) return;
       const key = `tasks:${session.user.id}`;
+      cacheKey.current = key;
       const cached = await readCache<Snapshot>(key).catch(() => null);
-      if (cached && active) setSnapshot(cached.value);
+      envelope.current = cached;
+      if (cached && active) {
+        snapshotRef.current = cached.value;
+        setSnapshot(cached.value);
+        setSyncing(true);
+      }
+      const revisionAtSyncStart = localRevision.current;
 
       const now = new Date();
       const full = !cached || now.getTime() - new Date(cached.fullSyncAt).getTime() > FULL_SYNC_INTERVAL;
@@ -51,20 +62,47 @@ export function TaskDataLoader({ initialTaskId }: { initialTaskId?: string }) {
       ]);
       const failure = [tasksResult, projectsResult, schedulesResult, logsResult, reflectionsResult].find(result => result.error)?.error;
       if (failure) throw failure;
-      const value: Snapshot = {
+      let value: Snapshot = {
         tasks: full ? tasksResult.data ?? [] : mergeUpdated(cached!.value.tasks, tasksResult.data ?? []),
         projects: full ? projectsResult.data ?? [] : mergeUpdated(cached!.value.projects, projectsResult.data ?? []),
         reflections: full ? reflectionsResult.data ?? [] : mergeUpdated(cached!.value.reflections, reflectionsResult.data ?? []),
         schedules: schedulesResult.data ?? [],
         workLogs: logsResult.data ?? [],
       };
-      const envelope: CacheEnvelope<Snapshot> = { value, syncedAt: now.toISOString(), fullSyncAt: full ? now.toISOString() : cached!.fullSyncAt };
-      await writeCache(key, envelope);
-      if (active) setSnapshot(value);
+      // An operation may finish while this request is in flight. Preserve its
+      // optimistic task list instead of painting an older server response over it.
+      if (localRevision.current !== revisionAtSyncStart && snapshotRef.current) {
+        value = { ...value, tasks: snapshotRef.current.tasks };
+      }
+      const serverEnvelope: CacheEnvelope<Snapshot> = { value, syncedAt: now.toISOString(), fullSyncAt: full ? now.toISOString() : cached!.fullSyncAt };
+      await writeCache(key, serverEnvelope);
+      if (active) {
+        // Keep TaskManager mounted: replacing it used to reset filters/drawers and
+        // made a background refresh look like a full-screen redraw.
+        setSnapshot((current) => current && JSON.stringify(current) === JSON.stringify(value) ? current : value);
+        snapshotRef.current = value;
+      }
+      if (active) envelope.current = serverEnvelope;
     })().catch(reason => active && setError(reason instanceof Error ? reason.message : "同期に失敗しました")).finally(() => active && setSyncing(false));
     return () => { active = false; };
   }, []);
 
+  const updateTasks = useCallback(async (tasks: Task[]) => {
+    if (!cacheKey.current || !snapshotRef.current) return;
+    const value = { ...snapshotRef.current, tasks };
+    const previous = envelope.current;
+    const nextEnvelope: CacheEnvelope<Snapshot> = {
+      value,
+      syncedAt: previous?.syncedAt ?? new Date(0).toISOString(),
+      fullSyncAt: previous?.fullSyncAt ?? new Date(0).toISOString(),
+    };
+    snapshotRef.current = value;
+    localRevision.current += 1;
+    envelope.current = nextEnvelope;
+    setSnapshot(value);
+    await writeCache(cacheKey.current, nextEnvelope);
+  }, []);
+
   if (!snapshot) return <div role="status" className="rounded-xl border bg-white p-8 text-center text-sm text-slate-500">タスクを読み込んでいます…</div>;
-  return <><div className="mb-2 text-right text-xs text-slate-400" aria-live="polite">{syncing ? "最新データを同期中…" : error ? `同期エラー: ${error}` : "最新データに同期済み"}</div><TaskManager key={snapshot.tasks.map(task => task.updated_at).join("|")} initialTasks={snapshot.tasks} projects={snapshot.projects} schedules={snapshot.schedules} workLogs={snapshot.workLogs} reflections={snapshot.reflections} initialTaskId={initialTaskId} /></>;
+  return <><div className="mb-2 text-right text-xs text-slate-400" aria-live="polite">{syncing ? "キャッシュを表示中・最新データを同期中…" : error ? `同期エラー: ${error}` : "最新データに同期済み"}</div><TaskManager initialTasks={snapshot.tasks} projects={snapshot.projects} schedules={snapshot.schedules} workLogs={snapshot.workLogs} reflections={snapshot.reflections} initialTaskId={initialTaskId} onTasksChange={updateTasks} /></>;
 }

@@ -56,6 +56,7 @@ export function TaskManager({
   workLogs,
   reflections,
   initialTaskId,
+  onTasksChange,
 }: {
   initialTasks: Task[];
   projects: Project[];
@@ -63,6 +64,7 @@ export function TaskManager({
   workLogs: WorkLog[];
   reflections: Reflection[];
   initialTaskId?: string;
+  onTasksChange: (tasks: Task[]) => Promise<void>;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [filter, setFilter] = useState<"open" | "all" | TaskStatus>("open");
@@ -86,6 +88,7 @@ export function TaskManager({
   } | null>(null);
   const [markdown, setMarkdown] = useState("");
   const [pending, startTransition] = useTransition();
+  useEffect(() => setTasks(initialTasks), [initialTasks]);
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) ?? "null");
@@ -165,26 +168,55 @@ export function TaskManager({
       ),
     [workLogs],
   );
+  type ActionResult = { error?: string; ok?: boolean; task?: Task; tasks?: Task[] };
   const run = (
-    action: Promise<{ error?: string; ok?: boolean }>,
-    optimistic?: () => void,
+    action: () => Promise<ActionResult>,
+    optimistic?: (current: Task[]) => Task[],
+    reconcile?: (current: Task[], result: ActionResult) => Task[],
   ) =>
     startTransition(async () => {
       const previous = tasks;
-      optimistic?.();
-      const result = await action;
-      if (result.error) {
-        setTasks(previous);
-        setNotice(`エラー: ${result.error}`);
-      } else {
+      const next = optimistic ? optimistic(previous) : previous;
+      try {
+        if (optimistic) {
+          setTasks(next);
+          await onTasksChange(next);
+        }
+        const result = await action();
+        if (result.error) throw new Error(result.error);
+        const committed = reconcile?.(next, result);
+        if (committed) {
+          setTasks(committed);
+          await onTasksChange(committed);
+        }
         setNotice("保存しました");
-        location.reload();
+      } catch (reason) {
+        setTasks(previous);
+        await onTasksChange(previous).catch(() => undefined);
+        setNotice(`エラー: ${reason instanceof Error ? reason.message : "保存に失敗しました"}`);
       }
     });
+  const optimisticTask = (input: TaskInput, id = crypto.randomUUID()): Task => {
+    const now = new Date().toISOString();
+    const progress = input.progress ?? 0;
+    return {
+      id, user_id: "pending", title: input.title.trim(), description: input.description ?? null,
+      project_id: input.project_id ?? null, parent_id: input.parent_id ?? null,
+      priority: input.priority ?? "medium", estimated_minutes: input.estimated_minutes ?? null,
+      due_at: input.due_at ?? null, status: input.status ?? (progress === 100 ? "done" : progress > 0 ? "doing" : "todo"),
+      progress, sort_order: tasks.length, completed_at: progress === 100 ? now : null,
+      created_at: now, updated_at: now,
+    };
+  };
   const add = (parent_id: string | null = null) => {
     const title = prompt(parent_id ? "子タスクのタイトル" : "タスクのタイトル");
-    if (title)
-      run(createTask({ title, parent_id, project_id: project || null }));
+    if (title) {
+      const input = { title, parent_id, project_id: project || null };
+      const temporary = optimisticTask(input);
+      run(() => createTask(input), current => [...current, temporary], (current, result) =>
+        result.task ? current.map(task => task.id === temporary.id ? result.task! : task) : current,
+      );
+    }
   };
   const exportText = async () => {
     const text = toMarkdown(tree);
@@ -199,11 +231,14 @@ export function TaskManager({
       .map((title) => title.trim())
       .filter(Boolean);
     if (!titles.length) return;
-    run(
-      createTasks(
-        titles.map((title) => ({ title, project_id: project || null })),
-      ),
-    );
+    const inputs = titles.map((title) => ({ title, project_id: project || null }));
+    const temporary = inputs.map(input => optimisticTask(input));
+    setQuick("");
+    run(() => createTasks(inputs), current => [...current, ...temporary], (current, result) => {
+      if (!result.tasks) return current;
+      const temporaryIds = new Set(temporary.map(task => task.id));
+      return [...current.filter(task => !temporaryIds.has(task.id)), ...result.tasks];
+    });
   };
   const moveTask = (draggedId: string, targetId: string, edge: "before" | "after") => {
     if (draggedId === targetId) return;
@@ -225,14 +260,12 @@ export function TaskManager({
     reordered.splice(targetIndex + (edge === "after" ? 1 : 0), 0, dragged);
     const order = new Map(reordered.map((task, index) => [task.id, index]));
     setSort("manual");
-    run(updateTaskOrder(reordered.map((task) => task.id)), () =>
-      setTasks((current) =>
+    run(() => updateTaskOrder(reordered.map((task) => task.id)), (current) =>
         current.map((task) =>
           order.has(task.id)
             ? { ...task, sort_order: order.get(task.id)! }
             : task,
         ),
-      ),
     );
   };
   return (
@@ -434,28 +467,17 @@ export function TaskManager({
                 projects={projects}
                 onSelect={setSelected}
                 onStatusChange={(node, status) =>
-                  run(updateTask(node.id, { ...node, status }), () =>
-                    setTasks((current) =>
-                      current.map((t) =>
-                        t.id === node.id
-                          ? { ...t, status }
-                          : t,
-                      ),
-                    ),
+                  run(() => updateTask(node.id, { ...node, status }), current =>
+                    current.map(t => t.id === node.id ? { ...t, status, progress: status === "done" ? 100 : t.progress, completed_at: status === "done" ? new Date().toISOString() : null } : t),
                   )
                 }
                 onPriorityChange={(node, priority) =>
-                  run(updateTask(node.id, { ...node, priority }), () =>
-                    setTasks((current) =>
-                      current.map((task) =>
-                        task.id === node.id ? { ...task, priority } : task,
-                      ),
-                    ),
+                  run(() => updateTask(node.id, { ...node, priority }), current =>
+                    current.map(task => task.id === node.id ? { ...task, priority } : task),
                   )
                 }
                 onProgressChange={(node, progress) =>
-                  run(saveProgress(node.id, progress, ""), () =>
-                    setTasks((current) =>
+                  run(() => saveProgress(node.id, progress, ""), current =>
                       current.map((task) =>
                         task.id === node.id
                           ? {
@@ -470,7 +492,6 @@ export function TaskManager({
                             }
                           : task,
                       ),
-                    ),
                   )
                 }
                 draggedTaskId={draggedTaskId}
@@ -484,9 +505,9 @@ export function TaskManager({
                 }}
                 onAdd={add}
                 onDueChange={(node, due_at) =>
-                  run(updateTask(node.id, { ...node, due_at }))
+                  run(() => updateTask(node.id, { ...node, due_at }), current => current.map(task => task.id === node.id ? { ...task, due_at } : task))
                 }
-                onDelete={(node) => run(deleteTask(node.id))}
+                onDelete={(node) => run(() => deleteTask(node.id), current => current.filter(task => task.id !== node.id && task.parent_id !== node.id))}
               />
             ))}
             <Pagination page={currentPage} totalItems={shown.length} pageSize={TASKS_PER_PAGE} onPageChange={setPage} />
@@ -518,13 +539,14 @@ export function TaskManager({
           onClose={() => setSelected(null)}
           onSave={(input, actualMinutes, correctedActual) =>
             run(
-              Promise.all([
+              () => Promise.all([
                 updateTask(selected.id, input),
                 ...(correctedActual === null ? [] : [correctActualMinutes(selected.id, correctedActual)]),
                 ...actualMinutes.map((minutes) => addWorkLog(selected.id, minutes)),
               ]).then((results) =>
                 results.find((result) => result.error) ?? { ok: true },
               ),
+              current => current.map(task => task.id === selected.id ? { ...task, ...input, title: input.title.trim() } : task),
             )
           }
           reflection={
@@ -537,7 +559,7 @@ export function TaskManager({
           markdown={markdown}
           setMarkdown={setMarkdown}
           onClose={() => setImportOpen(false)}
-          onImport={() => run(importTasks(markdown, project || undefined))}
+          onImport={() => run(() => importTasks(markdown, project || undefined))}
         />
       )}
     </div>
