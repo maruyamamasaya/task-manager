@@ -19,3 +19,4 @@ export interface ProgressLog { id:string;task_id:string;user_id:string;progress:
 export interface Reflection { id:string;task_id:string;user_id:string;result:string|null;good_points:string|null;problems:string|null;improvements:string|null;next_action:string|null;created_at:string;updated_at:string; }
 export type DayOffStatus = "holiday" | "paid_leave" | "am_leave" | "pm_leave";
 export interface DayOff { id:string;user_id:string;off_date:string;status:DayOffStatus;note:string|null;created_at:string;updated_at:string; }
+export interface WorkSettings { user_id:string;work_start:string;work_end:string;created_at:string;updated_at:string; }
