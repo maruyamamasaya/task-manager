@@ -476,6 +476,14 @@ export function TaskManager({
                     current.map(task => task.id === node.id ? { ...task, priority } : task),
                   )
                 }
+                onProjectChange={(node, projectId) =>
+                  run(() => updateTask(node.id, { ...node, project_id: projectId }), current =>
+                    current.map(task => task.id === node.id ? { ...task, project_id: projectId } : task),
+                  )
+                }
+                onActualChange={(node, minutes) =>
+                  run(() => correctActualMinutes(node.id, minutes))
+                }
                 onProgressChange={(node, progress) =>
                   run(() => saveProgress(node.id, progress, ""), current =>
                       current.map((task) =>
@@ -578,6 +586,8 @@ function TaskRow({
   onSelect,
   onStatusChange,
   onPriorityChange,
+  onProjectChange,
+  onActualChange,
   onProgressChange,
   draggedTaskId,
   dropTarget,
@@ -599,6 +609,8 @@ function TaskRow({
   onSelect: (t: Task) => void;
   onStatusChange: (t: TaskNode, status: TaskStatus) => void;
   onPriorityChange: (t: TaskNode, priority: Task["priority"]) => void;
+  onProjectChange: (t: TaskNode, projectId: string | null) => void;
+  onActualChange: (t: TaskNode, minutes: number) => void;
   onProgressChange: (t: TaskNode, progress: number) => void;
   draggedTaskId: string | null;
   dropTarget: { id: string; edge: "before" | "after" } | null;
@@ -610,7 +622,9 @@ function TaskRow({
   onDelete: (t: TaskNode) => void;
 }) {
   const [progress, setProgress] = useState(node.progress);
+  const [actualMinutes, setActualMinutes] = useState(actual);
   useEffect(() => setProgress(node.progress), [node.progress]);
+  useEffect(() => setActualMinutes(actual), [actual]);
   const isFolder = folderTaskIds.has(node.id);
   const isScheduled = scheduledTaskIds.has(node.id);
   const statusClass = {
@@ -618,6 +632,8 @@ function TaskRow({
     doing: "bg-amber-100 text-amber-700",
     done: "bg-emerald-100 text-emerald-700",
   }[node.status];
+  const selectedProject = projects.find((project) => project.id === node.project_id);
+  const projectColor = selectedProject?.color ?? "#64748b";
   return (
     <>
       <article
@@ -692,11 +708,6 @@ function TaskRow({
                   >
                     {(Object.keys(priorityLabel) as Task["priority"][]).map((value) => <option key={value} value={value}>優先度 {priorityLabel[value]}</option>)}
                   </select>
-                  {node.project_id && (
-                    <span className="max-w-36 truncate">
-                      {projects.find((p) => p.id === node.project_id)?.name}
-                    </span>
-                  )}
                   <label className="flex items-center gap-1.5">
                     期限
                     <input
@@ -764,11 +775,46 @@ function TaskRow({
                     {progress}%
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-slate-500">
-                  予定 {node.estimated_minutes ?? 0}分 / 実績 {actual}分
-                </p>
+                <PlanActualMeter estimated={node.estimated_minutes ?? 0} actual={actualMinutes} />
               </>
             )}{" "}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <select
+                value={node.project_id ?? ""}
+                onChange={(event) => onProjectChange(node, event.target.value || null)}
+                aria-label={`${node.title}のプロジェクトを変更`}
+                className="max-w-48 cursor-pointer truncate rounded-full border px-2.5 py-1 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-200"
+                style={{ borderColor: projectColor, color: projectColor, backgroundColor: `${projectColor}14` }}
+              >
+                <option value="">未分類</option>
+                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
+              {!isFolder && (
+                <label className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+                  実績
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    list={`actual-presets-${node.id}`}
+                    value={actualMinutes}
+                    onChange={(event) => setActualMinutes(Math.max(0, Number(event.target.value)))}
+                    onBlur={() => {
+                      const next = Math.round(actualMinutes);
+                      setActualMinutes(next);
+                      if (next !== actual) onActualChange(node, next);
+                    }}
+                    onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+                    aria-label={`${node.title}の実績時間（分）`}
+                    className="h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-right text-xs text-slate-700 outline-none focus:border-indigo-500"
+                  />
+                  <span>分</span>
+                  <datalist id={`actual-presets-${node.id}`}>
+                    {[0, 15, 30, 45, 60, 90, 120].map((minutes) => <option key={minutes} value={minutes} />)}
+                  </datalist>
+                </label>
+              )}
+            </div>
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-1">
             <button
@@ -814,6 +860,8 @@ function TaskRow({
           onSelect={onSelect}
           onStatusChange={onStatusChange}
           onPriorityChange={onPriorityChange}
+          onProjectChange={onProjectChange}
+          onActualChange={onActualChange}
           onProgressChange={onProgressChange}
           draggedTaskId={draggedTaskId}
           dropTarget={dropTarget}
@@ -1035,6 +1083,30 @@ function TaskDrawer({
           <div className="mt-5 flex gap-2"><button autoFocus type="button" onClick={() => setConfirmClose(false)} className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold">編集を続ける</button><button type="button" onClick={onClose} className="flex-1 rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white">破棄して閉じる</button></div>
         </section>
       </div>}
+    </div>
+  );
+}
+
+function PlanActualMeter({ estimated, actual }: { estimated: number; actual: number }) {
+  const scale = Math.max(estimated, actual, 1);
+  const estimatedWidth = `${(estimated / scale) * 100}%`;
+  const actualWidth = `${(actual / scale) * 100}%`;
+  const exceeded = estimated > 0 && actual > estimated;
+  return (
+    <div className="mt-2 rounded-lg bg-slate-50 px-2.5 py-2" aria-label={`予定${estimated}分、実績${actual}分`}>
+      <div className="grid grid-cols-[2.5rem_1fr_auto] items-center gap-2 text-[11px]">
+        <span className="font-semibold text-slate-500">予定</span>
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+          <div className="h-full rounded-full bg-indigo-400" style={{ width: estimatedWidth }} />
+        </div>
+        <span className="min-w-12 text-right font-bold text-indigo-700">{estimated}分</span>
+        <span className="font-semibold text-slate-500">実績</span>
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+          <div className={`h-full rounded-full ${exceeded ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: actualWidth }} />
+        </div>
+        <span className={`min-w-12 text-right font-bold ${exceeded ? "text-amber-700" : "text-emerald-700"}`}>{actual}分</span>
+      </div>
+      {exceeded && <p className="mt-1 text-right text-[10px] font-semibold text-amber-700">予定を {actual - estimated}分 超過</p>}
     </div>
   );
 }
