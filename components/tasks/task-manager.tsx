@@ -202,6 +202,7 @@ export function TaskManager({
       priority: input.priority ?? "medium", estimated_minutes: input.estimated_minutes ?? null,
       due_at: input.due_at ?? null, status: input.status ?? (progress === 100 ? "done" : progress > 0 ? "doing" : "todo"),
       progress, sort_order: tasks.length, completed_at: progress === 100 ? now : null,
+      reflection_skipped: input.reflection_skipped ?? false,
       created_at: now, updated_at: now,
     };
   };
@@ -995,6 +996,10 @@ function TaskDrawer({
                     ))}
                   </select>
                 </Field>
+                <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+                  <span><span className="block font-semibold">振り返りをスキップ</span><span className="mt-0.5 block text-xs font-normal text-slate-500">ONにすると、完了後の振り返り待ちに表示しません。</span></span>
+                  <input type="checkbox" checked={form.reflection_skipped} onChange={(e) => set("reflection_skipped", e.target.checked)} className="size-5 shrink-0 accent-indigo-600" aria-label="振り返りをスキップ" />
+                </label>
                 <Field label="予定時間 (分)">
                   <MinuteInput label="予定" ariaLabel="予定時間（分）" value={form.estimated_minutes ?? 0} tone="indigo" wide onChange={(value) => set("estimated_minutes", value)} />
                   <span className="mt-1 flex flex-wrap gap-1">
