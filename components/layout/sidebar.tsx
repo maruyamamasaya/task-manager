@@ -9,7 +9,7 @@ import { Icon, type IconName } from "@/components/ui/icon";
 const groups: { label: string; items: [string, string, IconName][] }[] = [
   { label: "ワークスペース", items: [["Today", "/today", "today"], ["タスク", "/tasks", "tasks"], ["スケジュール", "/schedule", "schedule"], ["プロジェクト", "/projects", "projects"], ["WBS", "/wbs", "wbs"]] },
   { label: "レビュー", items: [["振り返り", "/reflections", "reflections"], ["休日設定", "/holidays", "holidays"], ["勤務設定", "/settings", "settings"]] },
-  { label: "サポート", items: [["使い方マニュアル", "/manual/", "manual"]] },
+  { label: "サポート", items: [["使い方マニュアル", "/manual/", "manual"], ["便利ツール集", "https://maruyamamasaya.github.io/tool/", "tools"]] },
 ];
 const mobileItems = groups[0].items;
 const DEFAULT_WIDTH = 244;
@@ -60,7 +60,10 @@ export function Sidebar({ email }: { email: string }) {
         <Link href="/today" className="flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-slate-950 focus-visible:ring-2 focus-visible:ring-indigo-500"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-indigo-600 text-sm font-semibold text-white">T</span><span className="truncate text-base font-semibold tracking-tight">Taskflow</span></Link>
         <button type="button" onClick={() => setOpen(false)} aria-label="サイドバーを閉じる" title="サイドバーを閉じる" className="grid size-8 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"><Icon name="panelClose" className="size-[18px]" /></button>
       </div>
-      <div className="mt-8 flex-1 space-y-7">{groups.map(group => <section key={group.label}><h2 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{group.label}</h2><nav className="space-y-1">{group.items.map(([label, href, icon]) => <Link key={href} href={href} aria-current={active(href) ? "page" : undefined} className={`flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-colors ${active(href) ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`}><Icon name={icon} className="size-[18px] shrink-0"/>{label}</Link>)}</nav></section>)}</div>
+      <div className="mt-8 flex-1 space-y-7">{groups.map(group => <section key={group.label}><h2 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{group.label}</h2><nav className="space-y-1">{group.items.map(([label, href, icon]) => {
+        const isExternal = href.startsWith("http");
+        return <Link key={href} href={href} target={isExternal ? "_blank" : undefined} rel={isExternal ? "noopener noreferrer" : undefined} aria-current={!isExternal && active(href) ? "page" : undefined} className={`flex min-h-10 items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-colors ${!isExternal && active(href) ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`}><Icon name={icon} className="size-[18px] shrink-0"/>{label}</Link>;
+      })}</nav></section>)}</div>
       <div className="border-t border-slate-200 pt-4"><div className="flex items-center gap-2.5 px-2"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-700">{email.slice(0, 1).toUpperCase()}</span><p className="min-w-0 truncate text-xs text-slate-600">{email}</p></div><form action={logout}><button className="mt-2 flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 text-sm text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950"><Icon name="logout" className="size-4"/>ログアウト</button></form></div>
       <button type="button" aria-label="サイドバーの幅を変更" title="ドラッグして幅を変更（ダブルクリックでリセット）" onPointerDown={() => setIsResizing(true)} onDoubleClick={() => setWidth(DEFAULT_WIDTH)} className={`absolute inset-y-0 -right-1 z-20 hidden w-2 cursor-col-resize touch-none md:block ${isResizing ? "bg-indigo-500/30" : "hover:bg-indigo-500/20"}`} />
     </aside>
