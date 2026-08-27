@@ -155,13 +155,6 @@ export function TaskManager({
     () => new Set(schedules.map((schedule) => schedule.task_id)),
     [schedules],
   );
-  const childCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const task of tasks) {
-      if (task.parent_id) counts.set(task.parent_id, (counts.get(task.parent_id) ?? 0) + 1);
-    }
-    return counts;
-  }, [tasks]);
   const runningTaskIds = useMemo(
     () =>
       new Set(
@@ -459,7 +452,6 @@ export function TaskManager({
                 node={n}
                 folderTaskIds={folderTaskIds}
                 scheduledTaskIds={scheduledTaskIds}
-                childCounts={childCounts}
                 workLogs={workLogs}
                 runningTaskIds={runningTaskIds}
                 actual={totalWorkMinutes(
@@ -584,7 +576,6 @@ function TaskRow({
   node,
   folderTaskIds,
   scheduledTaskIds,
-  childCounts,
   projects,
   actual,
   workLogs,
@@ -608,7 +599,6 @@ function TaskRow({
   node: TaskNode;
   folderTaskIds: Set<string>;
   scheduledTaskIds: Set<string>;
-  childCounts: Map<string, number>;
   projects: Project[];
   actual: number;
   workLogs: WorkLog[];
@@ -670,11 +660,11 @@ function TaskRow({
           const rect = event.currentTarget.getBoundingClientRect();
           onDrop(node.id, event.clientY < rect.top + rect.height / 2 ? "before" : "after");
         }}
-        className={`task-sort-row group relative border-b border-slate-100 px-3 py-3 hover:bg-slate-50 ${node.status === "done" ? "opacity-60" : ""} ${draggedTaskId === node.id ? "bg-indigo-50 opacity-50" : ""} ${dropTarget?.id === node.id && draggedTaskId !== node.id ? `is-drop-${dropTarget.edge}` : ""}`}
+        className={`task-sort-row group relative border-b border-slate-100 px-3 py-3 hover:bg-slate-50 ${!isFolder && node.status === "done" ? "opacity-60" : ""} ${isFolder ? "bg-slate-50/70" : ""} ${draggedTaskId === node.id ? "bg-indigo-50 opacity-50" : ""} ${dropTarget?.id === node.id && draggedTaskId !== node.id ? `is-drop-${dropTarget.edge}` : ""}`}
         style={{ paddingLeft: `${12 + node.depth * 24}px` }}
       >
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 cursor-grab text-lg text-slate-400" aria-label={isFolder ? "フォルダ。ドラッグして並び替え" : "ドラッグして並び替え"}>
+          <span className={`mt-0.5 cursor-grab ${isFolder ? "text-xl" : "text-lg text-slate-400"}`} aria-label={isFolder ? "フォルダ。ドラッグして並び替え" : "ドラッグして並び替え"}>
             {isFolder ? "📁" : "⠿"}
           </span>
           <div className="min-w-0 flex-1">
@@ -683,20 +673,13 @@ function TaskRow({
               className="block w-full min-w-0 text-left"
             >
               <span
-                className={`block truncate text-sm font-medium ${node.status === "done" ? "line-through" : ""}`}
+                className={`block truncate ${isFolder ? "text-base font-bold text-slate-800" : "text-sm font-medium"} ${!isFolder && node.status === "done" ? "line-through" : ""}`}
                 title={node.title}
               >
                 {node.title}
               </span>
             </button>
-            {isFolder ? (
-              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-bold text-indigo-700">
-                  フォルダ
-                </span>
-                <span>{childCounts.get(node.id) ?? 0}件の子タスク</span>
-              </div>
-            ) : (
+            {!isFolder && (
               <>
                 <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                   <label
@@ -753,46 +736,8 @@ function TaskRow({
                       className="min-h-8 min-w-32 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                     />
                   </label>
-                  <label className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-500 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
-                    予定
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      inputMode="numeric"
-                      value={estimatedMinutes}
-                      onChange={(event) => setEstimatedMinutes(Math.max(0, Number(event.target.value)))}
-                      onBlur={() => {
-                        const next = Math.round(estimatedMinutes);
-                        setEstimatedMinutes(next);
-                        if (next !== (node.estimated_minutes ?? 0)) onEstimateChange(node, next);
-                      }}
-                      onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
-                      aria-label={`${node.title}の予定時間（分）`}
-                      className="number-input-no-spin w-12 bg-transparent text-right text-xs font-bold text-indigo-700 outline-none"
-                    />
-                    <span>分</span>
-                  </label>
-                  <label className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-500 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
-                    実績
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      inputMode="numeric"
-                      value={actualMinutes}
-                      onChange={(event) => setActualMinutes(Math.max(0, Number(event.target.value)))}
-                      onBlur={() => {
-                        const next = Math.round(actualMinutes);
-                        setActualMinutes(next);
-                        if (next !== actual) onActualChange(node, next);
-                      }}
-                      onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
-                      aria-label={`${node.title}の実績時間（分）`}
-                      className="number-input-no-spin w-12 bg-transparent text-right text-xs font-bold text-emerald-700 outline-none"
-                    />
-                    <span>分</span>
-                  </label>
+                  <MinuteInput label="予定" ariaLabel={`${node.title}の予定時間（分）`} value={estimatedMinutes} tone="indigo" onChange={setEstimatedMinutes} onCommit={(next) => { if (next !== (node.estimated_minutes ?? 0)) onEstimateChange(node, next); }} />
+                  <MinuteInput label="実績" ariaLabel={`${node.title}の実績時間（分）`} value={actualMinutes} tone="emerald" onChange={setActualMinutes} onCommit={(next) => { if (next !== actual) onActualChange(node, next); }} />
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   <span className="shrink-0 text-xs font-semibold text-slate-500">進捗</span>
@@ -843,25 +788,7 @@ function TaskRow({
                   </span>
                 </div>
               </>
-            )}{" "}
-            {isFolder && <div className="mt-2 flex flex-wrap items-center gap-2">
-              <label
-                className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold"
-                style={{ borderColor: projectColor, color: projectColor, backgroundColor: `${projectColor}14` }}
-              >
-                <Icon name="projects" className="size-3.5 shrink-0" />
-                <span className="sr-only">プロジェクト</span>
-                <select
-                  value={node.project_id ?? ""}
-                  onChange={(event) => onProjectChange(node, event.target.value || null)}
-                  aria-label={`${node.title}のプロジェクトを変更`}
-                  className="max-w-44 cursor-pointer truncate bg-transparent font-bold outline-none"
-                >
-                  <option value="">未分類</option>
-                  {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-                </select>
-              </label>
-            </div>}
+            )}
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-1">
             <button
@@ -899,7 +826,6 @@ function TaskRow({
           node={c}
           folderTaskIds={folderTaskIds}
           scheduledTaskIds={scheduledTaskIds}
-          childCounts={childCounts}
           workLogs={workLogs}
           runningTaskIds={runningTaskIds}
           actual={totalWorkMinutes(workLogs.filter((l) => l.task_id === c.id))}
@@ -1067,18 +993,7 @@ function TaskDrawer({
                   </select>
                 </Field>
                 <Field label="予定時間 (分)">
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.estimated_minutes ?? ""}
-                    onChange={(e) =>
-                      set(
-                        "estimated_minutes",
-                        e.target.value ? Number(e.target.value) : null,
-                      )
-                    }
-                    className={inputClass}
-                  />
+                  <MinuteInput label="予定" ariaLabel="予定時間（分）" value={form.estimated_minutes ?? 0} tone="indigo" wide onChange={(value) => set("estimated_minutes", value)} />
                   <span className="mt-1 flex flex-wrap gap-1">
                     {[15, 30, 45, 60, 90, 120].map((m) => (
                       <button
@@ -1147,6 +1062,37 @@ function Field({
       {label}
       <div className="mt-1.5">{children}</div>
     </label>
+  );
+}
+
+function MinuteInput({ label, ariaLabel, value, tone, onChange, onCommit, wide = false }: {
+  label: string;
+  ariaLabel: string;
+  value: number;
+  tone: "indigo" | "emerald";
+  onChange: (value: number) => void;
+  onCommit?: (value: number) => void;
+  wide?: boolean;
+}) {
+  const normalize = (minutes: number) => Math.max(0, Math.round(minutes / 5) * 5);
+  const apply = (minutes: number) => {
+    const next = normalize(minutes);
+    onChange(next);
+    onCommit?.(next);
+  };
+  const color = tone === "indigo" ? "text-indigo-700" : "text-emerald-700";
+  return (
+    <div className={`inline-flex items-stretch overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 ${wide ? "w-full" : "h-9"}`}>
+      <label className={`flex min-w-0 items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-500 ${wide ? "flex-1 py-2" : ""}`}>
+        <span>{label}</span>
+        <input type="number" min="0" step="5" inputMode="numeric" value={value} onChange={(event) => onChange(Math.max(0, Number(event.target.value)))} onBlur={() => apply(value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} aria-label={ariaLabel} className={`number-input-no-spin min-w-0 flex-1 bg-transparent text-right text-sm font-bold outline-none ${color}`} />
+        <span>分</span>
+      </label>
+      <div className="grid w-9 shrink-0 grid-rows-2 border-l border-slate-200" aria-label={`${label}時間の増減`}>
+        <button type="button" aria-label={`${label}時間を5分増やす`} onMouseDown={(event) => event.preventDefault()} onClick={() => apply(value + 5)} className="grid place-items-center border-b border-slate-200 text-[10px] leading-none text-slate-600 hover:bg-slate-100">▲</button>
+        <button type="button" aria-label={`${label}時間を5分減らす`} disabled={value <= 0} onMouseDown={(event) => event.preventDefault()} onClick={() => apply(value - 5)} className="grid place-items-center text-[10px] leading-none text-slate-600 hover:bg-slate-100 disabled:text-slate-300">▼</button>
+      </div>
+    </div>
   );
 }
 function ImportDialog({
