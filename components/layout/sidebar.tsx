@@ -7,7 +7,7 @@ import { Icon, type IconName } from "@/components/ui/icon";
 
 const groups: { label: string; items: [string, string, IconName][] }[] = [
   { label: "ワークスペース", items: [["Today", "/today", "today"], ["タスク", "/tasks", "tasks"], ["スケジュール", "/schedule", "schedule"], ["プロジェクト", "/projects", "projects"], ["WBS", "/wbs", "wbs"]] },
-  { label: "レビュー", items: [["振り返り", "/reflections", "reflections"], ["休日設定", "/holidays", "holidays"]] },
+  { label: "レビュー", items: [["振り返り", "/reflections", "reflections"], ["休日設定", "/holidays", "holidays"], ["勤務設定", "/settings", "settings"]] },
   { label: "サポート", items: [["使い方マニュアル", "/manual/", "manual"]] },
 ];
 const mobileItems = groups[0].items;

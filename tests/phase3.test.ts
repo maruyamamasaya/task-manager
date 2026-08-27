@@ -7,3 +7,5 @@ test("Tokyo日付と日次集計",()=>{assert.equal(tokyoDateKey("2026-08-25T16:
 test("schedule markdown follows plotter format",()=>{assert.equal(scheduleMarkdown("2026-08-25",[{task_id:"a",start_at:"2026-08-25T02:30:00Z",end_at:"2026-08-25T03:10:00Z"}],new Map([["a","テスト"]])),"## 2026/08/25 スケジュール\n\n11:30 - 12:10\nテスト")});
 test("日次報告に期限切れ・完了タスクと予定時間を含める",()=>{assert.equal(taskStatusMarkdown([{id:"a",title:"遅延タスク",due_at:"2026-08-24T08:00:00Z"}],[{id:"b",title:"完了タスク",due_at:null}],[{task_id:"a",start_at:"2026-08-25T02:30:00Z",end_at:"2026-08-25T03:10:00Z"}]),"## 期限切れ\n\n- 遅延タスク（期限: 2026/8/24 / 予定: 11:30 - 12:10）\n\n## 完了\n\n- 完了タスク（期限: 期限なし）")});
 test("カレンダーの日付と曜日を日本の暦日に合わせる",()=>{assert.equal(calendarWeekday("2026-08-25"),2);assert.equal(calendarWeekStart("2026-08-25"),"2026-08-23");assert.equal(addCalendarDays("2026-08-31",1),"2026-09-01")});
+import {formatWorkingDuration,workingMinutes} from "../lib/time/work-settings";
+test("勤務時間は休憩1時間を除いて計算する",()=>{assert.equal(workingMinutes("09:00","17:30"),450);assert.equal(formatWorkingDuration(450),"7時間30分");assert.equal(workingMinutes("17:30","09:00"),null)});
