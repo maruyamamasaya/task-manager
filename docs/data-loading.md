@@ -37,3 +37,21 @@ Tasks 再訪時は、認証セッションを確認した直後に IndexedDB の
 4. Realtime は即時反映の補助として利用し、切断後はカーソル同期で必ず回復する。
 
 上記の削除情報なしに15分全件同期だけを停止すると、別端末で削除されたデータがキャッシュに残るため、現段階では同期間隔とキャッシュ構造を維持する。
+
+## Realtime 購読監査（2026-08-27）
+
+アプリケーションコード全体（`app`、`components`、`lib`、`middleware.ts`）について、Supabase Realtime の channel 作成、`subscribe`、`postgres_changes`、channel の解除処理を調査した。
+
+| 画面・処理 | Realtime channel 数（1ユーザー・1画面） | 備考 |
+|---|---:|---|
+| Tasks | 0 | IndexedDB を先に表示し、REST/PostgREST の5クエリで再検証する |
+| Dashboard / Today / Schedule / Projects / Reflections / Analytics / Holidays / WBS | 0 | Server Component または Server Action から REST/PostgREST を利用する |
+| アプリ全体 | **0** | `.channel()`、`.subscribe()`、`postgres_changes` の呼び出しは存在しない |
+
+したがって、同一 channel の重複購読、再レンダリングや `useEffect` の依存配列による再購読、cleanup 時の `removeChannel` / `unsubscribe` 漏れは現行コードにはない。解除対象となる channel 自体が作られていないためである。Tasks のデータローダーの同期 effect は空の依存配列で、unmount 時には `active = false` として完了後の state 更新を止める。React Strict Mode が開発時に effect を再実行してもブラウザ用 Supabase client が増えないよう、`lib/supabase/client.ts` でも明示的に単一インスタンスを再利用する。
+
+### レスポンス増加との切り分け
+
+IndexedDB / stale-while-revalidate 導入後の Tasks 画面は、キャッシュの有無にかかわらずバックグラウンドで `tasks`、`projects`、`task_schedules`、`work_logs`、`reflections` の **5本の REST/PostgREST クエリ**と認証セッション確認を実行する。これらは Realtime の subscribe や Realtime response ではない。画面遷移・再マウントのたびに再検証されるため、Supabase の集計画面で API レスポンス全体を見ている場合は増加要因になり得るが、Realtime channel 数を増やす実装ではない。
+
+Realtime を将来導入する場合は、テーブルごとに channel を作らず、画面単位で安定した名前の1 channelへ必要な `postgres_changes` handlerをまとめ、空の依存配列を持つ effect から一度だけ subscribe すること。cleanup は同じ client と channel を閉じる `removeChannel(channel)` を必須とする。
