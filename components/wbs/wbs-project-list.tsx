@@ -34,8 +34,9 @@ export function WbsProjectList({ projects }: { projects: WbsProjectSummary[] }) 
           <h2 className="truncate text-base font-semibold text-slate-950 group-hover:text-indigo-700">{project.name}</h2>
           <div className="mt-5 flex items-center justify-between text-xs"><span className="font-medium text-slate-700">進捗</span><strong className="text-lg tabular-nums text-slate-900">{project.progress}%</strong></div>
           <WbsProgress value={project.progress} className="mt-2" />
+          <dl className="mt-4 grid grid-cols-4 gap-2 rounded-lg bg-slate-50 p-3 text-center"><CardMetric label="全体" value={project.itemCount} /><CardMetric label="期限切れ" value={project.overdueCount} alert={project.overdueCount > 0} /><CardMetric label="進行中" value={project.inProgressCount} /><CardMetric label="保留中" value={project.onHoldCount} /></dl>
           <div className="mt-4 flex items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${projectStatusStyle[project.status]}`}>{projectStatusLabel[project.status]}</span><span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">{roleLabel(project.role)}</span></div>
-          <div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-xs text-slate-500"><span>{project.itemCount}項目</span><time dateTime={project.updated_at}>更新 {new Date(project.updated_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric" })}</time></div>
+          <div className="mt-4 flex justify-end border-t border-slate-100 pt-3 text-xs text-slate-500"><time dateTime={project.updated_at}>更新 {new Date(project.updated_at).toLocaleDateString("ja-JP", { month: "short", day: "numeric" })}</time></div>
         </Link>)}
       </div>}
 
@@ -52,3 +53,4 @@ export function WbsProjectList({ projects }: { projects: WbsProjectSummary[] }) 
     </div>}
   </div>;
 }
+function CardMetric({label,value,alert=false}:{label:string;value:number;alert?:boolean}) { return <div><dt className="text-[10px] text-slate-500">{label}</dt><dd className={`mt-0.5 text-sm font-bold tabular-nums ${alert?"text-red-600":"text-slate-800"}`}>{value}</dd></div>; }
