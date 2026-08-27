@@ -167,7 +167,7 @@ export function TaskManager({
     action: () => Promise<ActionResult>,
     optimistic?: (current: Task[]) => Task[],
     reconcile?: (current: Task[], result: ActionResult) => Task[],
-  ) =>
+  ) => new Promise<boolean>((resolve) => {
     startTransition(async () => {
       const previous = tasks;
       const next = optimistic ? optimistic(previous) : previous;
@@ -184,12 +184,15 @@ export function TaskManager({
           await onTasksChange(committed);
         }
         setNotice("保存しました");
+        resolve(true);
       } catch (reason) {
         setTasks(previous);
         await onTasksChange(previous).catch(() => undefined);
         setNotice(`エラー: ${reason instanceof Error ? reason.message : "保存に失敗しました"}`);
+        resolve(false);
       }
     });
+  });
   const optimisticTask = (input: TaskInput, id = crypto.randomUUID()): Task => {
     const now = new Date().toISOString();
     const progress = input.progress ?? 0;
@@ -607,8 +610,8 @@ function TaskRow({
   onStatusChange: (t: TaskNode, status: TaskStatus) => void;
   onPriorityChange: (t: TaskNode, priority: Task["priority"]) => void;
   onProjectChange: (t: TaskNode, projectId: string | null) => void;
-  onActualChange: (t: TaskNode, minutes: number) => void;
-  onEstimateChange: (t: TaskNode, minutes: number) => void;
+  onActualChange: (t: TaskNode, minutes: number) => Promise<boolean>;
+  onEstimateChange: (t: TaskNode, minutes: number) => Promise<boolean>;
   onProgressChange: (t: TaskNode, progress: number) => void;
   draggedTaskId: string | null;
   dropTarget: { id: string; edge: "before" | "after" } | null;
@@ -736,8 +739,8 @@ function TaskRow({
                       className="min-h-8 min-w-32 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                     />
                   </label>
-                  <MinuteInput label="予定" ariaLabel={`${node.title}の予定時間（分）`} value={estimatedMinutes} tone="indigo" onChange={setEstimatedMinutes} onCommit={(next) => { if (next !== (node.estimated_minutes ?? 0)) onEstimateChange(node, next); }} />
-                  <MinuteInput label="実績" ariaLabel={`${node.title}の実績時間（分）`} value={actualMinutes} tone="emerald" onChange={setActualMinutes} onCommit={(next) => { if (next !== actual) onActualChange(node, next); }} />
+                  <MinuteInput label="予定" ariaLabel={`${node.title}の予定時間（分）`} value={estimatedMinutes} savedValue={node.estimated_minutes ?? 0} tone="indigo" onChange={setEstimatedMinutes} onCommit={(next) => onEstimateChange(node, next)} />
+                  <MinuteInput label="実績" ariaLabel={`${node.title}の実績時間（分）`} value={actualMinutes} savedValue={actual} tone="emerald" onChange={setActualMinutes} onCommit={(next) => onActualChange(node, next)} />
                 </div>
                 <div className="mt-2 flex items-center gap-2">
                   <span className="shrink-0 text-xs font-semibold text-slate-500">進捗</span>
@@ -1065,33 +1068,37 @@ function Field({
   );
 }
 
-function MinuteInput({ label, ariaLabel, value, tone, onChange, onCommit, wide = false }: {
+function MinuteInput({ label, ariaLabel, value, savedValue, tone, onChange, onCommit, wide = false }: {
   label: string;
   ariaLabel: string;
   value: number;
+  savedValue?: number;
   tone: "indigo" | "emerald";
   onChange: (value: number) => void;
-  onCommit?: (value: number) => void;
+  onCommit?: (value: number) => void | Promise<boolean>;
   wide?: boolean;
 }) {
   const normalize = (minutes: number) => Math.max(0, Math.round(minutes / 5) * 5);
-  const apply = (minutes: number) => {
+  const [confirmedValue, setConfirmedValue] = useState(savedValue);
+  useEffect(() => setConfirmedValue(savedValue), [savedValue]);
+  const applyLocal = (minutes: number) => {
     const next = normalize(minutes);
     onChange(next);
-    onCommit?.(next);
   };
+  const hasChanges = confirmedValue !== undefined && normalize(value) !== confirmedValue;
   const color = tone === "indigo" ? "text-indigo-700" : "text-emerald-700";
   return (
-    <div className={`inline-flex items-stretch overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 ${wide ? "w-full" : "h-9"}`}>
-      <label className={`flex min-w-0 items-center gap-1.5 px-2.5 text-xs font-semibold text-slate-500 ${wide ? "flex-1 py-2" : ""}`}>
+    <div className={`inline-flex items-stretch overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 ${wide ? "w-full" : "h-9 max-w-full"}`}>
+      <label className={`flex min-w-0 items-center gap-1 px-2 text-xs font-semibold text-slate-500 ${wide ? "flex-1 py-2" : ""}`}>
         <span>{label}</span>
-        <input type="number" min="0" step="5" inputMode="numeric" value={value} onChange={(event) => onChange(Math.max(0, Number(event.target.value)))} onBlur={() => apply(value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} aria-label={ariaLabel} className={`number-input-no-spin min-w-0 flex-1 bg-transparent text-right text-sm font-bold outline-none ${color}`} />
+        <input type="number" min="0" step="5" inputMode="numeric" value={value} onChange={(event) => onChange(Math.max(0, Number(event.target.value)))} onBlur={() => applyLocal(value)} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} aria-label={ariaLabel} className={`number-input-no-spin min-w-0 bg-transparent text-right text-sm font-bold outline-none ${wide ? "flex-1" : "w-10"} ${color}`} />
         <span>分</span>
       </label>
-      <div className="grid w-9 shrink-0 grid-rows-2 border-l border-slate-200" aria-label={`${label}時間の増減`}>
-        <button type="button" aria-label={`${label}時間を5分増やす`} onMouseDown={(event) => event.preventDefault()} onClick={() => apply(value + 5)} className="grid place-items-center border-b border-slate-200 text-[10px] leading-none text-slate-600 hover:bg-slate-100">▲</button>
-        <button type="button" aria-label={`${label}時間を5分減らす`} disabled={value <= 0} onMouseDown={(event) => event.preventDefault()} onClick={() => apply(value - 5)} className="grid place-items-center text-[10px] leading-none text-slate-600 hover:bg-slate-100 disabled:text-slate-300">▼</button>
+      <div className="grid w-8 shrink-0 grid-rows-2 border-l border-slate-200" aria-label={`${label}時間の増減`}>
+        <button type="button" aria-label={`${label}時間を5分増やす`} onMouseDown={(event) => event.preventDefault()} onClick={() => applyLocal(value + 5)} className="grid place-items-center border-b border-slate-200 text-[10px] leading-none text-slate-600 hover:bg-slate-100">▲</button>
+        <button type="button" aria-label={`${label}時間を5分減らす`} disabled={value <= 0} onMouseDown={(event) => event.preventDefault()} onClick={() => applyLocal(value - 5)} className="grid place-items-center text-[10px] leading-none text-slate-600 hover:bg-slate-100 disabled:text-slate-300">▼</button>
       </div>
+      {onCommit && <button type="button" disabled={!hasChanges} onClick={async () => { const next = normalize(value); const saved = await onCommit(next); if (saved !== false) setConfirmedValue(next); }} className="shrink-0 border-l border-slate-200 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50 disabled:cursor-default disabled:bg-slate-50 disabled:text-slate-300">更新</button>}
     </div>
   );
 }
