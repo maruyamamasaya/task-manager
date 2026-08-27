@@ -20,4 +20,13 @@ export function leafEffortTotals(items:WbsItem[]){
   }),{estimate:0,actual:0});
 }
 
+export function projectDateRange(items:WbsItem[]){
+  const startDates=items.flatMap(item=>item.start_date?[item.start_date]:[]);
+  const endDates=items.flatMap(item=>item.end_date?[item.end_date]:[]);
+  return {
+    startDate:startDates.length?startDates.reduce((earliest,date)=>date<earliest?date:earliest):null,
+    endDate:endDates.length?endDates.reduce((latest,date)=>date>latest?date:latest):null,
+  };
+}
+
 export function isWbsItemOverdue(item:WbsItem,today:string){return !!item.end_date&&item.end_date<today&&item.status!=="completed"&&item.status!=="on_hold"}
