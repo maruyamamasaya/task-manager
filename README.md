@@ -67,7 +67,7 @@ npm run dev
 - `types/`: ドメイン型
 - `supabase/migrations/`: PostgreSQL schema と RLS
 
-保護ルートは middleware で未認証アクセスを `/login` に戻し、サーバーレイアウトでも `getUser()` により再検証します。
+保護ルートは middleware で Supabase セッション Cookie がないアクセスを即座に `/login` に戻します。Routing Middleware から外部通信は行わず、Cookie が古い・不正な場合も含め、サーバーレイアウトの `getUser()` でユーザーを再検証してから非公開データを表示します。
 
 ## Vercel へのデプロイ
 
