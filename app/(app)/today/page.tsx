@@ -25,9 +25,10 @@ export default async function Page() {
   const db = await createClient();
   const date = tokyoDateKey(new Date());
   const bounds = tokyoDayBounds(date);
-  const [{ data: all, error }, { data: schedules }, { data: logs }, { data: projects }, { data: workSettings }] = await Promise.all([
+  const [{ data: all, error }, { data: schedules }, { data: meetings }, { data: logs }, { data: projects }, { data: workSettings }] = await Promise.all([
     db.from("tasks").select("*").order("due_at", { nullsFirst: false }),
     db.from("task_schedules").select("*").gte("start_at", bounds.start).lt("start_at", bounds.end).order("start_at"),
+    db.from("meetings").select("start_at,end_at").gte("start_at", bounds.start).lt("start_at", bounds.end),
     db.from("work_logs").select("*").gte("started_at", bounds.start).lt("started_at", bounds.end),
     db.from("projects").select("*").eq("archived", false),
     db.from("work_settings").select("work_start,work_end").maybeSingle(),
@@ -43,7 +44,7 @@ export default async function Page() {
   const projectMap = new Map(((projects as Project[]) ?? []).map(project => [project.id, project]));
   const logsByTask = (logs ?? []).reduce((map, log) => map.set(log.task_id, [...(map.get(log.task_id) ?? []), log]), new Map<string, WorkLog[]>());
   const schedulesByTask = (schedules ?? []).reduce((map, schedule) => map.set(schedule.task_id, [...(map.get(schedule.task_id) ?? []), schedule]), new Map<string, TaskSchedule[]>());
-  const totals = dailyTotals(schedules ?? [], logs ?? []);
+  const totals = dailyTotals(schedules ?? [], logs ?? [], meetings ?? []);
   const plannedWorkMinutes = workingMinutes(workSettings?.work_start ?? DEFAULT_WORK_START, workSettings?.work_end ?? DEFAULT_WORK_END) ?? 450;
   const workDifference = totals.actual - plannedWorkMinutes;
   const reportMarkdown = `# 今日の予定報告\n\n予定 ${plannedWorkMinutes}分 / 実績 ${totals.actual}分 / 差分 ${varianceLabel(workDifference)}\n\n${scheduleMarkdown(date, schedules ?? [], new Map((scheduledTasks ?? []).map(task => [task.id, task.title])))}\n\n${taskStatusMarkdown(overdue, done, schedules ?? [])}`;
