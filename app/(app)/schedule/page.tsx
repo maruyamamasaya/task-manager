@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { PageHeader } from "@/components/ui/page-header";
 import { DaySchedule } from "@/components/schedule/day-schedule";
 import { ScheduleCalendar } from "@/components/schedule/schedule-calendar";
 import { createClient } from "@/lib/supabase/server";
@@ -84,47 +83,51 @@ export default async function Page({
         : `${date.replaceAll("-", "/")}（${weekday}）`;
   return (
     <>
-      <PageHeader
-        title="Schedule"
-        description="月・週・日の階層で、予定の密度から時間割まで確認できます。"
-      />
-      <div className="schedule-view-tabs">
-        {(
-          [
-            ["month", "月"],
-            ["week", "週"],
-            ["day", "日"],
-          ] as const
-        ).map(([key, text]) => (
-          <Link
-            key={key}
-            className={view === key ? "active" : ""}
-            href={`/schedule?view=${key}&date=${date}`}
-          >
-            {text}
-          </Link>
-        ))}
-      </div>
-      <div className="schedule-date-controls">
-        <Link className="schedule-today-button" href={`/schedule?view=${view}`}>
-          今日
-        </Link>
-        <nav className="schedule-date-nav">
-          <Link
-            href={`/schedule?view=${view}&date=${shift(date, view, -1)}`}
-            aria-label="前へ"
-          >
-            ←
-          </Link>
-          <b>{label}</b>
-          <Link
-            href={`/schedule?view=${view}&date=${shift(date, view, 1)}`}
-            aria-label="次へ"
-          >
-            →
-          </Link>
-        </nav>
-      </div>
+      <header className="schedule-toolbar">
+        <div className="schedule-toolbar-title">
+          <h1>Schedule</h1>
+          <p>月・週・日の階層で、予定の密度から時間割まで確認できます。</p>
+        </div>
+        <div className="schedule-toolbar-controls">
+          <nav className="schedule-view-tabs" aria-label="表示単位">
+            {(
+              [
+                ["month", "月"],
+                ["week", "週"],
+                ["day", "日"],
+              ] as const
+            ).map(([key, text]) => (
+              <Link
+                key={key}
+                className={view === key ? "active" : ""}
+                href={`/schedule?view=${key}&date=${date}`}
+              >
+                {text}
+              </Link>
+            ))}
+          </nav>
+          <div className="schedule-date-controls">
+            <Link className="schedule-today-button" href={`/schedule?view=${view}`}>
+              今日
+            </Link>
+            <nav className="schedule-date-nav" aria-label="日付の移動">
+              <Link
+                href={`/schedule?view=${view}&date=${shift(date, view, -1)}`}
+                aria-label="前へ"
+              >
+                ←
+              </Link>
+              <b>{label}</b>
+              <Link
+                href={`/schedule?view=${view}&date=${shift(date, view, 1)}`}
+                aria-label="次へ"
+              >
+                →
+              </Link>
+            </nav>
+          </div>
+        </div>
+      </header>
       {view === "day" ? (
         <DaySchedule
           date={date}
