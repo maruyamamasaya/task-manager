@@ -18,6 +18,7 @@ const refresh = () => {
   revalidatePath("/today");
   revalidatePath("/projects");
   revalidatePath("/reflections");
+  revalidatePath("/dashboard");
 };
 export type TaskInput = {
   title: string;
@@ -29,6 +30,7 @@ export type TaskInput = {
   due_at?: string | null;
   status?: TaskStatus;
   progress?: number;
+  reflection_skipped?: boolean;
 };
 
 export async function createTask(input: TaskInput) {
@@ -102,6 +104,7 @@ export async function updateTask(id: string, input: TaskInput) {
       priority: input.priority,
       estimated_minutes: input.estimated_minutes ?? null,
       due_at: input.due_at || null,
+      reflection_skipped: input.reflection_skipped ?? false,
       ...state,
       completed_at: state.status === "done" ? new Date().toISOString() : null,
     })
