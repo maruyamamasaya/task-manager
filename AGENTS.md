@@ -6,11 +6,11 @@
 
 1. 本ファイルを読む。
 2. [`CURRENT.md`](CURRENT.md) で現在の機能、制約、優先事項を確認する。
-3. [`ARCHITECTURE.md`](ARCHITECTURE.md) で変更対象の責務とデータフローを確認する。
-4. タスクに関係する [`decisions/`](decisions/) の ADR と、必要ならリンク先の詳細資料だけを読む。
-5. 関連コード、migration、テスト、Git 履歴を調査してから変更する。
+3. [`CODEMAP.md`](CODEMAP.md) から機能の入口と検索語を選び、必要な節だけ [`ARCHITECTURE.md`](ARCHITECTURE.md) で確認する。
+4. symbol 名が不明なら利用可能な semantic / repository search、判明後は symbol・exact・references search（Language Server、IDE、`rg`、`git grep` など）で対象を絞る。
+5. definition、呼び出し元・呼び出し先、関連テスト、設定、データ依存を確認してから変更する。対象に近い `AGENTS.md` と関連 ADR も読む。
 
-全ドキュメントや全 session を無条件に読みません。session は調査経緯が必要な場合だけ参照します。コードと文書が食い違う場合はコードを現在状態の一次情報として確認しますが、意図は推測せず、不明点として記録します。
+「検索 → 対象特定 → 必要な部分だけ読む」を基本とし、全ドキュメント、全コード、全 session を無条件に読みません。取得するコンテキストは (1) `AGENTS.md` + `CURRENT.md`、(2) 関連する code map / architecture、(3) 検索結果、(4) 対象、(5) 依存とテストの順です。コードと文書が食い違う場合はコードを現在状態の一次情報として確認しますが、意図は推測せず記録します。
 
 ## 実装ルール
 
@@ -20,21 +20,32 @@
 - RLS、認証、所有権検証、入力検証を安易に弱めない。`service_role` key をアプリに追加しない。
 - エラーを隠すだけの回避策を恒久対応にしない。暫定対応なら制約と撤去条件を記録する。
 - DB を変更するときは [`supabase/AGENTS.md`](supabase/AGENTS.md) に従い、既存 migration を編集せず新規 migration を追加する。
+- `app/` の route、Server Component、Server Action を変更するときは [`app/AGENTS.md`](app/AGENTS.md) に従う。
 - `CURRENT.md` と `ARCHITECTURE.md` には現在有効な事実だけを置く。理由は ADR、作業経緯は session に分離する。
 
 ## 検証コマンド
 
-構成に応じて次を実行します（存在しないコマンドを無理に実行しません）。
+標準検証と変更種別ごとの追加検証は [`TESTING.md`](TESTING.md) を正本とします。
 
 ```bash
-npm test
-npm run lint
-npm run build
+npm run verify:fast  # 実装中
+npm run verify       # 完了前
 git diff --check
-git diff
 ```
 
-`package.json` に独立した `typecheck` script はありません。通常のアプリ型検査は `next build`、テスト対象の型検査は `npm test` 内の `tsc -p tsconfig.test.json` が担います。DB 変更時は利用可能な環境で `npx supabase db push` も確認します。
+起動、環境変数、migration、デプロイは [`OPERATIONS.md`](OPERATIONS.md) を参照します。
+
+## ドキュメントの更新条件
+
+- `CURRENT.md`: 現在状態・制約・優先事項が変わったとき。
+- `ARCHITECTURE.md`: 責務境界、構成、データフローが変わったとき。
+- `CODEMAP.md`: 主要な入口、配置、検索語が変わったとき。
+- `TESTING.md`: 検証コマンドや必須検証が変わったとき。
+- `OPERATIONS.md`: セットアップ、環境変数、運用、デプロイ方法が変わったとき。
+- `decisions/`: 将来の変更で理由の理解が必要な重要判断が発生したとき。
+- `sessions/`: AI 作業終了時。Request / Investigation / Changes / Validation / Result / Remaining Issues だけを簡潔に残す。
+
+詳細は正本へリンクし、同じ説明を複数文書へコピーしません。
 
 ## Definition of Done
 
@@ -42,8 +53,8 @@ git diff
 
 1. 変更に必要なテストを追加・実行した。
 2. lint を実行した。
-3. 利用可能な typecheck を実行した。
-4. build を実行した。
+3. 完了前に原則 `npm run verify`（test、lint、build / 型検査）を実行した。
+4. DB など標準 verify 外の対象別検証を実行した。
 5. `git diff` と `git diff --check` を確認した。
 6. ドキュメント更新要否を判定した。
 7. `CURRENT.md` を更新した（現在状態に影響しない場合は不要と判断した旨を session に残す）。

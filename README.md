@@ -5,6 +5,9 @@ Taskflow は、Project、実行 Task、独立した共同編集 WBS に仕事を
 ## ドキュメント
 
 - 開発を始める AI / 開発者: [`AGENTS.md`](AGENTS.md) → [`CURRENT.md`](CURRENT.md) → [`ARCHITECTURE.md`](ARCHITECTURE.md)
+- コード探索の入口: [`CODEMAP.md`](CODEMAP.md)
+- テストと標準 verify: [`TESTING.md`](TESTING.md)
+- セットアップ・環境変数・デプロイ: [`OPERATIONS.md`](OPERATIONS.md)
 - 設計判断: [`decisions/`](decisions/)
 - 作業記録: [`sessions/`](sessions/)
 - データ読み込みとcacheの詳細: [`docs/data-loading.md`](docs/data-loading.md)
@@ -22,41 +25,16 @@ Taskflow は、Project、実行 Task、独立した共同編集 WBS に仕事を
 
 ## セットアップ
 
-前提は Node.js 20.9 以上、npm、および必要に応じて Supabase CLI です。
-
-```bash
-npm install
-cp .env.example .env.local
-```
-
-Supabase Dashboard の **Project Settings > API** にある公開用の値を設定します。
-
-```dotenv
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-or-anon-key
-```
-
-`service_role` key はアプリの環境変数に設定せず、コミットしないでください。Supabase側ではEmail/Passwordを有効化して利用者を作成し、projectをlinkしてmigrationを適用します（本アプリにサインアップ画面はありません）。
-
-```bash
-npx supabase login
-npx supabase link --project-ref <project-ref>
-npx supabase db push
-npm run dev
-```
-
-`http://localhost:3000/login` からログインします。DBを変更するときは既存migrationを書き換えず、[`supabase/AGENTS.md`](supabase/AGENTS.md) に従って追加migrationを作成してください。
+ローカル起動、環境変数、Supabase migration の手順は [`OPERATIONS.md`](OPERATIONS.md) を正本とします。利用者の操作方法は [`public/manual/README.md`](public/manual/README.md) を参照してください。
 
 ## 品質チェック
 
 ```bash
-npm test
-npm run lint
-npm run build
+npm run verify
 ```
 
-独立した `typecheck` script はありません。`npm test` がテスト対象を `tsc` でcompileし、`npm run build` がアプリの型検査を含みます。
+Fast / Full の使い分け、変更種別ごとの必須検証、DB検証は [`TESTING.md`](TESTING.md) を参照してください。
 
 ## デプロイ
 
-想定構成はSupabase migrationを先に適用し、その後VercelへNext.jsをデプロイする順序です。Vercelには上記2環境変数を設定し、Supabase AuthのSite URL / Redirect URLsを環境に合わせます。リポジトリ内にCI/CD workflowや実環境識別子はないため、デプロイ前に運用環境を確認してください。
+デプロイ順序と、リポジトリから確認できない運用情報は [`OPERATIONS.md`](OPERATIONS.md) に集約しています。
