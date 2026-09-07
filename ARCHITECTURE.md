@@ -1,6 +1,6 @@
 ---
 status: active
-updated: 2026-08-28
+updated: 2026-09-07
 ---
 
 # アーキテクチャ
@@ -73,8 +73,6 @@ DBは日時を `timestamptz` で保存し、入力、日境界、表示は `Asia
 
 想定デプロイ先は Vercel、DB/Auth は Supabase です。migration を先に `npx supabase db push` で適用し、その後 Next.js をデプロイします。ただし自動化workflowと実環境設定はリポジトリにありません。
 
-- `npm test`: test用 TypeScript compile + Node test runner
-- `npm run lint`: ESLint（Next.js / TypeScript）
-- `npm run build`: production build とアプリ型検査
+検証コマンドと対象別の選択は [`TESTING.md`](TESTING.md)、環境変数・migration適用・デプロイ手順は [`OPERATIONS.md`](OPERATIONS.md) を正本とします。標準の完了前検証は `npm run verify` です。
 
 設計判断の根拠は [`decisions/`](decisions/) に、現在の制約は [`CURRENT.md`](CURRENT.md) に分離します。

@@ -1,6 +1,6 @@
 ---
 status: active
-updated: 2026-08-28
+updated: 2026-09-07
 ---
 
 # 現在の状態
@@ -20,6 +20,7 @@ Taskflow は、認証ユーザーが仕事を Project、実行 Task、独立し�
 - 通常の Project / Task とはリンクしない WBS Project。最大3階層、共有コード、owner/editor/viewer、参加申請、並べ替え、CSV、ガント表示、親項目の工数・進捗・状態の自動集約を備える。
 - Tasks 画面の IndexedDB キャッシュと stale-while-revalidate。Realtime subscription は現時点で使用していない。
 - Docsify で配信する利用者マニュアル（`public/manual/`）。
+- 検索入口 `CODEMAP.md`、領域別 `AGENTS.md`、Fast / Full の標準 verify を備えた AI 開発フロー。
 
 ## 既知の制約・未解決事項
 
@@ -36,7 +37,7 @@ Taskflow は、認証ユーザーが仕事を Project、実行 Task、独立し�
 
 ## 次のアクション
 
-1. 変更対象に応じて [`ARCHITECTURE.md`](ARCHITECTURE.md) と関連 ADR を読む。
+1. [`CODEMAP.md`](CODEMAP.md) から変更対象を検索し、関連する [`ARCHITECTURE.md`](ARCHITECTURE.md) の節と ADR だけを読む。
 2. データ同期を拡張する場合は、tombstone / カーソル / pagination を先に設計する。
 3. DB 変更は追加 migration とRLSをセットで行う。
 4. 実環境に関わる作業では、未確認のデプロイ・Supabase構成を担当者に確認する。
