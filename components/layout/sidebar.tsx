@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { logout } from "@/app/(auth)/login/actions";
+import { AppMark } from "@/components/ui/app-mark";
 import { Icon, type IconName } from "@/components/ui/icon";
 
 const groups: { label: string; items: [string, string, IconName][] }[] = [
@@ -57,7 +58,7 @@ export function Sidebar({ email }: { email: string }) {
   return <>
     <aside style={{ width }} className={`${isOpen ? "md:flex" : "md:hidden"} relative hidden h-screen shrink-0 flex-col border-r border-slate-200/80 bg-white px-4 py-5 md:sticky md:top-0`}>
       <div className="flex items-center justify-between gap-2">
-        <Link href="/today" className="flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-slate-950 focus-visible:ring-2 focus-visible:ring-indigo-500"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-indigo-600 text-sm font-semibold text-white">T</span><span className="truncate text-base font-semibold tracking-tight">Taskflow</span></Link>
+        <Link href="/today" className="flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-slate-950 focus-visible:ring-2 focus-visible:ring-indigo-500"><AppMark className="size-8 shrink-0 drop-shadow-sm" /><span className="truncate text-base font-semibold tracking-tight">Taskflow</span></Link>
         <button type="button" onClick={() => setOpen(false)} aria-label="サイドバーを閉じる" title="サイドバーを閉じる" className="grid size-8 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"><Icon name="panelClose" className="size-[18px]" /></button>
       </div>
       <div className="mt-8 flex-1 space-y-7">{groups.map(group => <section key={group.label}><h2 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{group.label}</h2><nav className="space-y-1">{group.items.map(([label, href, icon]) => {
